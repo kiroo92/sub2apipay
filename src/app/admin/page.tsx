@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import OrderTable from '@/components/admin/OrderTable';
 import OrderDetail from '@/components/admin/OrderDetail';
+import PaginationBar from '@/components/PaginationBar';
 
 interface AdminOrder {
   id: string;
@@ -198,60 +199,15 @@ function AdminContent() {
         )}
       </div>
 
-      {/* Pagination */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500">
-        <div className="flex items-center gap-2">
-          <span>共 {total} 条，每页</span>
-          {[20, 50, 100].map((s) => (
-            <button
-              key={s}
-              onClick={() => { setPageSize(s); setPage(1); }}
-              className={`rounded border px-2.5 py-1 text-xs font-medium transition-colors ${
-                pageSize === s
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setPage(1)}
-              disabled={page <= 1}
-              className="rounded border px-2.5 py-1 disabled:opacity-40 hover:bg-gray-100"
-            >
-              ««
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="rounded border px-3 py-1 disabled:opacity-40 hover:bg-gray-100"
-            >
-              上一页
-            </button>
-            <span className="px-3 py-1">
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="rounded border px-3 py-1 disabled:opacity-40 hover:bg-gray-100"
-            >
-              下一页
-            </button>
-            <button
-              onClick={() => setPage(totalPages)}
-              disabled={page >= totalPages}
-              className="rounded border px-2.5 py-1 disabled:opacity-40 hover:bg-gray-100"
-            >
-              »»
-            </button>
-          </div>
-        )}
-      </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        loading={loading}
+        onPageChange={(p) => setPage(p)}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+      />
 
       {/* Order Detail */}
       {detailOrder && <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} />}

@@ -46,6 +46,9 @@ function PayContent() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [resolvedUserId, setResolvedUserId] = useState<number | null>(null);
   const [myOrders, setMyOrders] = useState<MyOrder[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersHasMore, setOrdersHasMore] = useState(false);
+  const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<'pay' | 'orders'>('pay');
 
   const [config, setConfig] = useState<AppConfig>({
@@ -113,8 +116,12 @@ function PayContent() {
 
           if (Array.isArray(meData.orders)) {
             setMyOrders(meData.orders);
+            setOrdersPage(1);
+            setOrdersHasMore((meData.total_pages ?? 1) > 1);
           } else {
             setMyOrders([]);
+            setOrdersPage(1);
+            setOrdersHasMore(false);
           }
           return;
         }
@@ -123,8 +130,32 @@ function PayContent() {
       // 无 token 或 token 失效：只显示用户 ID，不展示隐私信息
       setUserInfo({ id: userId, username: `用户 #${userId}`, balance: 0 });
       setMyOrders([]);
+      setOrdersPage(1);
+      setOrdersHasMore(false);
     } catch {
       // ignore and keep page usable
+    }
+  };
+
+  const loadMoreOrders = async () => {
+    if (!token || ordersLoadingMore || !ordersHasMore) return;
+    const nextPage = ordersPage + 1;
+    setOrdersLoadingMore(true);
+    try {
+      const res = await fetch(`/api/orders/my?token=${encodeURIComponent(token)}&page=${nextPage}&page_size=20`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.orders) && data.orders.length > 0) {
+        setMyOrders((prev) => [...prev, ...data.orders]);
+        setOrdersPage(nextPage);
+        setOrdersHasMore(nextPage < (data.total_pages ?? 1));
+      } else {
+        setOrdersHasMore(false);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setOrdersLoadingMore(false);
     }
   };
 
@@ -329,7 +360,10 @@ function PayContent() {
                 isDark={isDark}
                 hasToken={hasToken}
                 orders={myOrders}
+                hasMore={ordersHasMore}
+                loadingMore={ordersLoadingMore}
                 onRefresh={loadUserAndOrders}
+                onLoadMore={loadMoreOrders}
               />
             )
           ) : (

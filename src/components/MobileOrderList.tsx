@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import OrderFilterBar from '@/components/OrderFilterBar';
 import {
   formatStatus,
@@ -14,16 +14,45 @@ interface MobileOrderListProps {
   isDark: boolean;
   hasToken: boolean;
   orders: MyOrder[];
+  hasMore: boolean;
+  loadingMore: boolean;
   onRefresh: () => void;
+  onLoadMore: () => void;
 }
 
-export default function MobileOrderList({ isDark, hasToken, orders, onRefresh }: MobileOrderListProps) {
+export default function MobileOrderList({
+  isDark,
+  hasToken,
+  orders,
+  hasMore,
+  loadingMore,
+  onRefresh,
+  onLoadMore,
+}: MobileOrderListProps) {
   const [activeFilter, setActiveFilter] = useState<OrderStatusFilter>('ALL');
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const filteredOrders = useMemo(() => {
     if (activeFilter === 'ALL') return orders;
     return orders.filter((item) => item.status === activeFilter);
   }, [orders, activeFilter]);
+
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore]);
 
   return (
     <div className="space-y-3">
@@ -91,6 +120,27 @@ export default function MobileOrderList({ isDark, hasToken, orders, onRefresh }:
               </div>
             </div>
           ))}
+
+          {/* 无限滚动哨兵 */}
+          {hasMore && (
+            <div ref={sentinelRef} className="py-3 text-center">
+              {loadingMore ? (
+                <span className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                  加载中...
+                </span>
+              ) : (
+                <span className={['text-xs', isDark ? 'text-slate-600' : 'text-slate-300'].join(' ')}>
+                  上滑加载更多
+                </span>
+              )}
+            </div>
+          )}
+
+          {!hasMore && orders.length > 0 && (
+            <div className={['py-2 text-center text-xs', isDark ? 'text-slate-600' : 'text-slate-400'].join(' ')}>
+              已显示全部订单
+            </div>
+          )}
         </div>
       )}
     </div>
