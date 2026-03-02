@@ -14,9 +14,13 @@ function isLocalAdminToken(token: string): boolean {
 async function isSub2ApiAdmin(token: string): Promise<boolean> {
   try {
     const env = getEnv();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!response.ok) return false;
     const data = await response.json();
     return data.data?.role === 'admin';

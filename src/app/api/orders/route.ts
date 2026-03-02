@@ -7,8 +7,8 @@ const createOrderSchema = z.object({
   user_id: z.number().int().positive(),
   amount: z.number().positive(),
   payment_type: z.enum(['alipay', 'wxpay', 'stripe']),
-  src_host: z.string().optional(),
-  src_url: z.string().optional(),
+  src_host: z.string().max(253).optional(),
+  src_url: z.string().max(2048).optional(),
 });
 
 export async function POST(request: NextRequest) {
