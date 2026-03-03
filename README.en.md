@@ -116,7 +116,7 @@ ENABLED_PAYMENT_TYPES=alipay,wxpay
 
 #### EasyPay (Alipay / WeChat Pay)
 
-Any payment provider compatible with the **EasyPay protocol** can be used, such as ZPay (`https://z-pay.cn/?uid=23808`) (this link contains the author's referral code — feel free to remove it).
+Any payment provider compatible with the **EasyPay protocol** can be used, such as [ZPay](https://z-pay.cn/?uid=23808) (`https://z-pay.cn/?uid=23808`) (this link contains the author's referral code — feel free to remove it).
 
 <details>
 <summary>ZPay Registration QR Code</summary>
