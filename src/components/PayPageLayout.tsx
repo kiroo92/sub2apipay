@@ -25,7 +25,7 @@ export default function PayPageLayout({
     <div
       className={[
         'relative w-full overflow-hidden',
-        isEmbedded ? 'p-2' : 'min-h-screen p-3 sm:p-4',
+        isEmbedded ? 'min-h-screen p-2' : 'min-h-screen p-3 sm:p-4',
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900',
       ].join(' ')}
     >
