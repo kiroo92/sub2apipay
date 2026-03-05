@@ -486,6 +486,7 @@ function PayContent() {
           onBack={handleBack}
           dark={isDark}
           isEmbedded={isEmbedded}
+          isMobile={isMobile}
         />
       )}
 

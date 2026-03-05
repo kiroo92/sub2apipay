@@ -38,12 +38,19 @@ export const FILTER_OPTIONS: { key: OrderStatusFilter; label: string }[] = [
 export function detectDeviceIsMobile(): boolean {
   if (typeof window === 'undefined') return false;
 
+  // 1. 现代 API（Chromium 系浏览器，最准确）
+  const uad = (navigator as Navigator & { userAgentData?: { mobile: boolean } }).userAgentData;
+  if (uad !== undefined) return uad.mobile;
+
+  // 2. UA 正则兜底（Safari / Firefox 等）
   const ua = navigator.userAgent || '';
   const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Windows Phone|Mobile/i.test(ua);
+  if (mobileUA) return true;
+
+  // 3. 触控 + 小屏兜底（新版 iPad UA 伪装成 Mac 的情况）
   const smallPhysicalScreen = Math.min(window.screen.width, window.screen.height) <= 768;
   const touchCapable = navigator.maxTouchPoints > 1;
-
-  return mobileUA || (touchCapable && smallPhysicalScreen);
+  return touchCapable && smallPhysicalScreen;
 }
 
 export function formatStatus(status: string): string {

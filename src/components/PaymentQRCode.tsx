@@ -18,6 +18,7 @@ interface PaymentQRCodeProps {
   onBack: () => void;
   dark?: boolean;
   isEmbedded?: boolean;
+  isMobile?: boolean;
 }
 
 const TEXT_EXPIRED = '\u8BA2\u5355\u5DF2\u8D85\u65F6';
@@ -26,6 +27,7 @@ const TEXT_GO_PAY = '\u70B9\u51FB\u524D\u5F80\u652F\u4ED8';
 const TEXT_SCAN_PAY = '\u8BF7\u4F7F\u7528\u652F\u4ED8\u5E94\u7528\u626B\u7801\u652F\u4ED8';
 const TEXT_BACK = '\u8FD4\u56DE';
 const TEXT_CANCEL_ORDER = '\u53D6\u6D88\u8BA2\u5355';
+const TEXT_H5_HINT = '\u652F\u4ED8\u5B8C\u6210\u540E\u8BF7\u8FD4\u56DE\u6B64\u9875\u9762\uFF0C\u7CFB\u7EDF\u5C06\u81EA\u52A8\u786E\u8BA4';
 const TERMINAL_STATUSES = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUNDED', 'REFUND_FAILED']);
 
 export default function PaymentQRCode({
@@ -43,6 +45,7 @@ export default function PaymentQRCode({
   onBack,
   dark = false,
   isEmbedded = false,
+  isMobile = false,
 }: PaymentQRCodeProps) {
   const displayAmount = payAmountProp ?? amount;
   const hasFeeDiff = payAmountProp !== undefined && payAmountProp !== amount;
@@ -416,6 +419,21 @@ export default function PaymentQRCode({
                 </>
               )}
             </div>
+          ) : isMobile && payUrl ? (
+            <>
+              <a
+                href={payUrl}
+                target={isEmbedded ? '_blank' : '_self'}
+                rel="noopener noreferrer"
+                className={`flex w-full items-center justify-center gap-2 rounded-lg py-3 font-medium text-white shadow-md ${iconBgClass}`}
+              >
+                <img src={iconSrc} alt={channelLabel} className="h-5 w-5 brightness-0 invert" />
+                {`打开${channelLabel}支付`}
+              </a>
+              <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
+                {TEXT_H5_HINT}
+              </p>
+            </>
           ) : (
             <>
               {qrDataUrl && (
