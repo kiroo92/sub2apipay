@@ -6,7 +6,7 @@ import { getMethodDailyLimit } from './limits';
 import { getMethodFeeRate, calculatePayAmount } from './fee';
 import { initPaymentProviders, paymentRegistry } from '@/lib/payment';
 import type { PaymentType, PaymentNotification } from '@/lib/payment';
-import { getUser, createAndRedeem, subtractBalance } from '@/lib/sub2api/client';
+import { getUser, createAndRedeem, subtractBalance, addBalance } from '@/lib/sub2api/client';
 import { Prisma } from '@prisma/client';
 import { deriveOrderState, isRefundStatus } from './status';
 
@@ -101,29 +101,33 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   const payAmount = calculatePayAmount(input.amount, feeRate);
 
   const expiresAt = new Date(Date.now() + env.ORDER_TIMEOUT_MINUTES * 60 * 1000);
-  const order = await prisma.order.create({
-    data: {
-      userId: input.userId,
-      userEmail: user.email,
-      userName: user.username,
-      userNotes: user.notes || null,
-      amount: new Prisma.Decimal(input.amount.toFixed(2)),
-      payAmount: new Prisma.Decimal(payAmount.toFixed(2)),
-      feeRate: feeRate > 0 ? new Prisma.Decimal(feeRate.toFixed(2)) : null,
-      rechargeCode: '',
-      status: 'PENDING',
-      paymentType: input.paymentType,
-      expiresAt,
-      clientIp: input.clientIp,
-      srcHost: input.srcHost || null,
-      srcUrl: input.srcUrl || null,
-    },
-  });
+  const order = await prisma.$transaction(async (tx) => {
+    const created = await tx.order.create({
+      data: {
+        userId: input.userId,
+        userEmail: user.email,
+        userName: user.username,
+        userNotes: user.notes || null,
+        amount: new Prisma.Decimal(input.amount.toFixed(2)),
+        payAmount: new Prisma.Decimal(payAmount.toFixed(2)),
+        feeRate: feeRate > 0 ? new Prisma.Decimal(feeRate.toFixed(2)) : null,
+        rechargeCode: '',
+        status: 'PENDING',
+        paymentType: input.paymentType,
+        expiresAt,
+        clientIp: input.clientIp,
+        srcHost: input.srcHost || null,
+        srcUrl: input.srcUrl || null,
+      },
+    });
 
-  const rechargeCode = generateRechargeCode(order.id);
-  await prisma.order.update({
-    where: { id: order.id },
-    data: { rechargeCode },
+    const rechargeCode = generateRechargeCode(created.id);
+    await tx.order.update({
+      where: { id: created.id },
+      data: { rechargeCode },
+    });
+
+    return { ...created, rechargeCode };
   });
 
   try {
@@ -363,14 +367,19 @@ export async function confirmPayment(input: {
     );
   }
 
+  // 只接受 PENDING 状态，或过期不超过 5 分钟的 EXPIRED 订单（支付在过期边缘完成的宽限窗口）
+  const graceDeadline = new Date(Date.now() - 5 * 60 * 1000);
   const result = await prisma.order.updateMany({
     where: {
       id: order.id,
-      status: { in: [ORDER_STATUS.PENDING, ORDER_STATUS.EXPIRED] },
+      OR: [
+        { status: ORDER_STATUS.PENDING },
+        { status: ORDER_STATUS.EXPIRED, updatedAt: { gte: graceDeadline } },
+      ],
     },
     data: {
       status: ORDER_STATUS.PAID,
-      amount: paidAmount,
+      payAmount: paidAmount,
       paymentTradeNo: input.tradeNo,
       paidAt: new Date(),
       failedAt: null,
@@ -486,8 +495,8 @@ export async function executeRecharge(orderId: string): Promise<void> {
       `sub2apipay recharge order:${orderId}`,
     );
 
-    await prisma.order.update({
-      where: { id: orderId },
+    await prisma.order.updateMany({
+      where: { id: orderId, status: ORDER_STATUS.RECHARGING },
       data: { status: ORDER_STATUS.COMPLETED, completedAt: new Date() },
     });
 
@@ -664,23 +673,52 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
   }
 
   try {
-    if (order.paymentTradeNo) {
-      initPaymentProviders();
-      const provider = paymentRegistry.getProvider(order.paymentType as PaymentType);
-      await provider.refund({
-        tradeNo: order.paymentTradeNo,
-        orderId: order.id,
-        amount: refundAmount,
-        reason: input.reason,
-      });
-    }
-
+    // 1. 先扣减用户余额（安全方向：先扣后退）
     await subtractBalance(
       order.userId,
       rechargeAmount,
       `sub2apipay refund order:${order.id}`,
       `sub2apipay:refund:${order.id}`,
     );
+
+    // 2. 调用支付网关退款
+    if (order.paymentTradeNo) {
+      try {
+        initPaymentProviders();
+        const provider = paymentRegistry.getProvider(order.paymentType as PaymentType);
+        await provider.refund({
+          tradeNo: order.paymentTradeNo,
+          orderId: order.id,
+          amount: refundAmount,
+          reason: input.reason,
+        });
+      } catch (gatewayError) {
+        // 3. 网关退款失败 — 恢复已扣减的余额
+        try {
+          await addBalance(
+            order.userId,
+            rechargeAmount,
+            `sub2apipay refund rollback order:${order.id}`,
+            `sub2apipay:refund-rollback:${order.id}`,
+          );
+        } catch (rollbackError) {
+          // 余额恢复也失败，记录审计日志，需人工介入
+          await prisma.auditLog.create({
+            data: {
+              orderId: input.orderId,
+              action: 'REFUND_ROLLBACK_FAILED',
+              detail: JSON.stringify({
+                gatewayError: gatewayError instanceof Error ? gatewayError.message : String(gatewayError),
+                rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                rechargeAmount,
+              }),
+              operator: 'admin',
+            },
+          });
+        }
+        throw gatewayError;
+      }
+    }
 
     await prisma.order.update({
       where: { id: input.orderId },

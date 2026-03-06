@@ -76,6 +76,7 @@ export async function createPayment(opts: CreatePaymentOptions): Promise<EasyPay
     method: 'POST',
     body: formData,
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    signal: AbortSignal.timeout(10_000),
   });
 
   const data = (await response.json()) as EasyPayCreateResponse;
@@ -88,7 +89,9 @@ export async function createPayment(opts: CreatePaymentOptions): Promise<EasyPay
 export async function queryOrder(outTradeNo: string): Promise<EasyPayQueryResponse> {
   const env = assertEasyPayEnv(getEnv());
   const url = `${env.EASY_PAY_API_BASE}/api.php?act=order&pid=${env.EASY_PAY_PID}&key=${env.EASY_PAY_PKEY}&out_trade_no=${outTradeNo}`;
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(10_000),
+  });
   const data = (await response.json()) as EasyPayQueryResponse;
   if (data.code !== 1) {
     throw new Error(`EasyPay query order failed: ${data.msg || 'unknown error'}`);
@@ -109,6 +112,7 @@ export async function refund(tradeNo: string, outTradeNo: string, money: string)
     method: 'POST',
     body: params,
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    signal: AbortSignal.timeout(10_000),
   });
   const data = (await response.json()) as EasyPayRefundResponse;
   if (data.code !== 1) {

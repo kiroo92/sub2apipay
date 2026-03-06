@@ -19,6 +19,7 @@ export async function getCurrentUserByToken(token: string): Promise<Sub2ApiUser>
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {
@@ -33,6 +34,7 @@ export async function getUser(userId: number): Promise<Sub2ApiUser> {
   const env = getEnv();
   const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/users/${userId}`, {
     headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {
@@ -61,6 +63,7 @@ export async function createAndRedeem(
       user_id: userId,
       notes,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {
@@ -87,10 +90,35 @@ export async function subtractBalance(
       amount,
       notes,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(`Subtract balance failed (${response.status}): ${JSON.stringify(errorData)}`);
+  }
+}
+
+export async function addBalance(
+  userId: number,
+  amount: number,
+  notes: string,
+  idempotencyKey: string,
+): Promise<void> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/users/${userId}/balance`, {
+    method: 'POST',
+    headers: getHeaders(idempotencyKey),
+    body: JSON.stringify({
+      operation: 'add',
+      amount,
+      notes,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Add balance failed (${response.status}): ${JSON.stringify(errorData)}`);
   }
 }
