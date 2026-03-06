@@ -346,7 +346,16 @@ function PayContent() {
         ) : undefined
       }
     >
-      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+      {error && (
+        <div
+          className={[
+            'mb-4 rounded-lg border p-3 text-sm',
+            isDark ? 'border-red-700 bg-red-900/30 text-red-400' : 'border-red-200 bg-red-50 text-red-600',
+          ].join(' ')}
+        >
+          {error}
+        </div>
+      )}
 
       {step === 'form' && isMobile && (
         <div

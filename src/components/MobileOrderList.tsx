@@ -84,7 +84,7 @@ export default function MobileOrderList({
             isDark ? 'border-amber-500/40 text-amber-200' : 'border-amber-300 text-amber-700',
           ].join(' ')}
         >
-          当前链接未携带登录 token，无法查询&ldquo;我的订单&rdquo;。
+          当前链接未携带登录 token，无法查询"我的订单"。
         </div>
       ) : filteredOrders.length === 0 ? (
         <div

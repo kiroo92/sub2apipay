@@ -28,14 +28,13 @@ interface PaymentQRCodeProps {
   isMobile?: boolean;
 }
 
-const TEXT_EXPIRED = '\u8BA2\u5355\u5DF2\u8D85\u65F6';
-const TEXT_REMAINING = '\u5269\u4F59\u652F\u4ED8\u65F6\u95F4';
-const TEXT_GO_PAY = '\u70B9\u51FB\u524D\u5F80\u652F\u4ED8';
-const TEXT_SCAN_PAY = '\u8BF7\u4F7F\u7528\u652F\u4ED8\u5E94\u7528\u626B\u7801\u652F\u4ED8';
-const TEXT_BACK = '\u8FD4\u56DE';
-const TEXT_CANCEL_ORDER = '\u53D6\u6D88\u8BA2\u5355';
-const TEXT_H5_HINT =
-  '\u652F\u4ED8\u5B8C\u6210\u540E\u8BF7\u8FD4\u56DE\u6B64\u9875\u9762\uFF0C\u7CFB\u7EDF\u5C06\u81EA\u52A8\u786E\u8BA4';
+const TEXT_EXPIRED = '订单已超时';
+const TEXT_REMAINING = '剩余支付时间';
+const TEXT_GO_PAY = '点击前往支付';
+const TEXT_SCAN_PAY = '请使用支付应用扫码支付';
+const TEXT_BACK = '返回';
+const TEXT_CANCEL_ORDER = '取消订单';
+const TEXT_H5_HINT = '支付完成后请返回此页面，系统将自动确认';
 
 export default function PaymentQRCode({
   orderId,
@@ -57,6 +56,7 @@ export default function PaymentQRCode({
   const displayAmount = payAmountProp ?? amount;
   const hasFeeDiff = payAmountProp !== undefined && payAmountProp !== amount;
   const [timeLeft, setTimeLeft] = useState('');
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(Infinity);
   const [expired, setExpired] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [imageLoading, setImageLoading] = useState(false);
@@ -264,13 +264,16 @@ export default function PaymentQRCode({
 
       if (diff <= 0) {
         setTimeLeft(TEXT_EXPIRED);
+        setTimeLeftSeconds(0);
         setExpired(true);
         return;
       }
 
+      const totalSeconds = Math.floor(diff / 1000);
       const minutes = Math.floor(diff / 60000);
       const seconds = Math.floor((diff % 60000) / 1000);
       setTimeLeft(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      setTimeLeftSeconds(totalSeconds);
     };
 
     updateTimer();
@@ -340,18 +343,16 @@ export default function PaymentQRCode({
   if (cancelBlocked) {
     return (
       <div className="flex flex-col items-center space-y-4 py-8">
-        <div className="text-6xl text-green-600">{'\u2713'}</div>
-        <h2 className="text-xl font-bold text-green-600">{'\u8BA2\u5355\u5DF2\u652F\u4ED8'}</h2>
+        <div className="text-6xl text-green-600">{'✓'}</div>
+        <h2 className="text-xl font-bold text-green-600">{'订单已支付'}</h2>
         <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-          {
-            '\u8BE5\u8BA2\u5355\u5DF2\u652F\u4ED8\u5B8C\u6210\uFF0C\u65E0\u6CD5\u53D6\u6D88\u3002\u5145\u503C\u5C06\u81EA\u52A8\u5230\u8D26\u3002'
-          }
+          {'该订单已支付完成，无法取消。充值将自动到账。'}
         </p>
         <button
           onClick={onBack}
           className="mt-4 w-full rounded-lg bg-blue-600 py-3 font-medium text-white hover:bg-blue-700"
         >
-          {'\u8FD4\u56DE\u5145\u503C'}
+          {'返回充值'}
         </button>
       </div>
     );
@@ -361,7 +362,7 @@ export default function PaymentQRCode({
     <div className="flex flex-col items-center space-y-4">
       <div className="text-center">
         <div className="text-4xl font-bold text-blue-600">
-          {'\u00A5'}
+          {'¥'}
           {displayAmount.toFixed(2)}
         </div>
         {hasFeeDiff && (
@@ -369,7 +370,7 @@ export default function PaymentQRCode({
             到账 ¥{amount.toFixed(2)}
           </div>
         )}
-        <div className={`mt-1 text-sm ${expired ? 'text-red-500' : dark ? 'text-slate-400' : 'text-gray-500'}`}>
+        <div className={`mt-1 text-sm ${expired ? 'text-red-500' : !expired && timeLeftSeconds <= 60 ? 'text-red-500 animate-pulse' : dark ? 'text-slate-400' : 'text-gray-500'}`}>
           {expired ? TEXT_EXPIRED : `${TEXT_REMAINING}: ${timeLeft}`}
         </div>
       </div>
@@ -397,7 +398,10 @@ export default function PaymentQRCode({
                   </span>
                 </div>
               ) : stripeError && !stripeLib ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{stripeError}</div>
+                <div className={[
+                  'rounded-lg border p-3 text-sm',
+                  dark ? 'border-red-700 bg-red-900/30 text-red-400' : 'border-red-200 bg-red-50 text-red-600',
+                ].join(' ')}>{stripeError}</div>
               ) : (
                 <>
                   <div
@@ -414,7 +418,7 @@ export default function PaymentQRCode({
                   )}
                   {stripeSuccess ? (
                     <div className="text-center">
-                      <div className="text-4xl text-green-600">{'\u2713'}</div>
+                      <div className="text-4xl text-green-600">{'✓'}</div>
                       <p className={['mt-2 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
                         支付成功，正在处理订单...
                       </p>
@@ -514,7 +518,7 @@ export default function PaymentQRCode({
               )}
 
               <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                {`\u8BF7\u6253\u5F00${channelLabel}\u626B\u4E00\u626B\u5B8C\u6210\u652F\u4ED8`}
+                {`请打开${channelLabel}扫一扫完成支付`}
               </p>
             </>
           )}
@@ -536,7 +540,12 @@ export default function PaymentQRCode({
         {!expired && token && (
           <button
             onClick={handleCancel}
-            className="flex-1 rounded-lg border border-red-300 py-2 text-sm text-red-600 hover:bg-red-50"
+            className={[
+              'flex-1 rounded-lg border py-2 text-sm',
+              dark
+                ? 'border-red-700 text-red-400 hover:bg-red-900/30'
+                : 'border-red-300 text-red-600 hover:bg-red-50',
+            ].join(' ')}
           >
             {TEXT_CANCEL_ORDER}
           </button>

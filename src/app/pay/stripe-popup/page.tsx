@@ -177,14 +177,14 @@ function StripePopupContent() {
         >
           <div className="text-center">
             <div className="text-3xl font-bold text-blue-600">
-              {'\u00A5'}
+              {'¥'}
               {amount.toFixed(2)}
             </div>
             <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>订单号: {orderId}</p>
           </div>
           {stripeError ? (
             <div className="space-y-3">
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{stripeError}</div>
+              <div className={`rounded-lg border p-3 text-sm ${isDark ? 'border-red-700 bg-red-900/30 text-red-400' : 'border-red-200 bg-red-50 text-red-600'}`}>{stripeError}</div>
               <button
                 type="button"
                 onClick={() => window.close()}
@@ -213,7 +213,7 @@ function StripePopupContent() {
       >
         <div className="text-center">
           <div className="text-3xl font-bold text-blue-600">
-            {'\u00A5'}
+            {'¥'}
             {amount.toFixed(2)}
           </div>
           <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>订单号: {orderId}</p>
@@ -226,7 +226,7 @@ function StripePopupContent() {
           </div>
         ) : stripeSuccess ? (
           <div className="py-6 text-center">
-            <div className="text-5xl text-green-600">{'\u2713'}</div>
+            <div className="text-5xl text-green-600">{'✓'}</div>
             <p className={`mt-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
               支付成功，窗口即将自动关闭...
             </p>
@@ -241,7 +241,7 @@ function StripePopupContent() {
         ) : (
           <>
             {stripeError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">{stripeError}</div>
+              <div className={`rounded-lg border p-3 text-sm ${isDark ? 'border-red-700 bg-red-900/30 text-red-400' : 'border-red-200 bg-red-50 text-red-600'}`}>{stripeError}</div>
             )}
             <div
               ref={stripeContainerRef}

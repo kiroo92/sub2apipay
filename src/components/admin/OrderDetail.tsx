@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { getPaymentDisplayInfo } from '@/lib/pay-utils';
 
 interface AuditLog {
@@ -45,6 +46,14 @@ interface OrderDetailProps {
 }
 
 export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const fields = [
     { label: '订单号', value: order.id },
     { label: '用户ID', value: order.userId },
@@ -52,9 +61,9 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
     { label: '邮箱', value: order.userEmail || '-' },
     { label: '金额', value: `¥${order.amount.toFixed(2)}` },
     { label: '状态', value: order.status },
-    { label: 'Payment OK', value: order.paymentSuccess ? 'yes' : 'no' },
-    { label: 'Recharge OK', value: order.rechargeSuccess ? 'yes' : 'no' },
-    { label: 'Recharge Status', value: order.rechargeStatus || '-' },
+    { label: '支付成功', value: order.paymentSuccess ? 'yes' : 'no' },
+    { label: '充值成功', value: order.rechargeSuccess ? 'yes' : 'no' },
+    { label: '充值状态', value: order.rechargeStatus || '-' },
     { label: '支付渠道', value: getPaymentDisplayInfo(order.paymentType).channel },
     { label: '提供商', value: getPaymentDisplayInfo(order.paymentType).provider || '-' },
     { label: '充值码', value: order.rechargeCode },
