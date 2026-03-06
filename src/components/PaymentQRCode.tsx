@@ -71,9 +71,11 @@ export default function PaymentQRCode({
   const paymentMethodListenerAdded = useRef(false);
 
   const qrPayload = useMemo(() => {
+    // alipay_direct 的 payUrl 是跳转链接，不应生成二维码
+    if (isAlipayDirect && !qrCode) return '';
     const value = (qrCode || payUrl || '').trim();
     return value;
-  }, [qrCode, payUrl]);
+  }, [qrCode, payUrl, isAlipayDirect]);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,6 +316,8 @@ export default function PaymentQRCode({
   };
 
   const isWx = paymentType?.startsWith('wxpay');
+  // alipay_direct 使用电脑网站支付，payUrl 是跳转链接不是二维码内容
+  const isAlipayDirect = paymentType === 'alipay_direct';
   const iconSrc = isStripe ? '' : isWx ? '/icons/wxpay.svg' : '/icons/alipay.svg';
   const channelLabel = isStripe ? 'Stripe' : isWx ? '\u5FAE\u4FE1' : '\u652F\u4ED8\u5B9D';
   const iconBgClass = isStripe ? 'bg-[#635bff]' : isWx ? 'bg-[#07C160]' : 'bg-[#1677FF]';
@@ -447,6 +451,21 @@ export default function PaymentQRCode({
               >
                 <img src={iconSrc} alt={channelLabel} className="h-5 w-5 brightness-0 invert" />
                 {`打开${channelLabel}支付`}
+              </a>
+              <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
+                {TEXT_H5_HINT}
+              </p>
+            </>
+          ) : isAlipayDirect && payUrl ? (
+            <>
+              <a
+                href={payUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#1677FF] py-3 font-medium text-white shadow-md hover:bg-[#0958d9] active:bg-[#003eb3]"
+              >
+                <img src={iconSrc} alt={channelLabel} className="h-5 w-5 brightness-0 invert" />
+                前往支付宝收银台
               </a>
               <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
                 {TEXT_H5_HINT}
