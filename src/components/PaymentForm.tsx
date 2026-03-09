@@ -258,7 +258,7 @@ export default function PaymentForm({
                         ? 'cursor-not-allowed border-slate-700 bg-slate-800/50 opacity-50'
                         : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50'
                       : isSelected
-                        ? `${meta?.selectedBorder || 'border-blue-500'} ${meta?.selectedBg || 'bg-blue-50'} ${dark ? 'text-slate-100' : 'text-slate-900'} shadow-sm`
+                        ? `${meta?.selectedBorder || 'border-blue-500'} ${dark ? (meta?.selectedBgDark || 'bg-blue-950') : (meta?.selectedBg || 'bg-blue-50')} ${dark ? 'text-slate-100' : 'text-slate-900'} shadow-sm`
                         : dark
                           ? 'border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500'
                           : 'border-gray-300 bg-white text-slate-700 hover:border-gray-400',

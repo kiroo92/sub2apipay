@@ -80,6 +80,8 @@ export interface PaymentTypeMeta {
   color: string;
   selectedBorder: string;
   selectedBg: string;
+  /** 暗色模式选中背景 */
+  selectedBgDark: string;
   iconBg: string;
   /** 图标路径（Stripe 不使用外部图标） */
   iconSrc?: string;
@@ -96,6 +98,7 @@ export const PAYMENT_TYPE_META: Record<string, PaymentTypeMeta> = {
     color: '#00AEEF',
     selectedBorder: 'border-cyan-400',
     selectedBg: 'bg-cyan-50',
+    selectedBgDark: 'bg-cyan-950',
     iconBg: 'bg-[#00AEEF]',
     iconSrc: '/icons/alipay.svg',
     chartBar: { light: 'bg-cyan-500', dark: 'bg-cyan-400' },
@@ -107,6 +110,7 @@ export const PAYMENT_TYPE_META: Record<string, PaymentTypeMeta> = {
     color: '#1677FF',
     selectedBorder: 'border-blue-500',
     selectedBg: 'bg-blue-50',
+    selectedBgDark: 'bg-blue-950',
     iconBg: 'bg-[#1677FF]',
     iconSrc: '/icons/alipay.svg',
     chartBar: { light: 'bg-blue-500', dark: 'bg-blue-400' },
@@ -118,6 +122,7 @@ export const PAYMENT_TYPE_META: Record<string, PaymentTypeMeta> = {
     color: '#2BB741',
     selectedBorder: 'border-green-500',
     selectedBg: 'bg-green-50',
+    selectedBgDark: 'bg-green-950',
     iconBg: 'bg-[#2BB741]',
     iconSrc: '/icons/wxpay.svg',
     chartBar: { light: 'bg-green-500', dark: 'bg-green-400' },
@@ -129,6 +134,7 @@ export const PAYMENT_TYPE_META: Record<string, PaymentTypeMeta> = {
     color: '#07C160',
     selectedBorder: 'border-green-600',
     selectedBg: 'bg-green-50',
+    selectedBgDark: 'bg-green-950',
     iconBg: 'bg-[#07C160]',
     iconSrc: '/icons/wxpay.svg',
     chartBar: { light: 'bg-emerald-500', dark: 'bg-emerald-400' },
@@ -140,6 +146,7 @@ export const PAYMENT_TYPE_META: Record<string, PaymentTypeMeta> = {
     color: '#635bff',
     selectedBorder: 'border-[#635bff]',
     selectedBg: 'bg-[#635bff]/10',
+    selectedBgDark: 'bg-[#635bff]/20',
     iconBg: 'bg-[#635bff]',
     chartBar: { light: 'bg-purple-500', dark: 'bg-purple-400' },
     buttonClass: 'bg-[#635bff] hover:bg-[#5249d9] active:bg-[#4840c4]',
