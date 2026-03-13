@@ -102,3 +102,16 @@ export async function parseAlipayJsonResponse<T>(response: Response): Promise<T>
   const text = decodeAlipayPayload(rawBody, { 'content-type': contentType });
   return JSON.parse(text) as T;
 }
+
+/**
+ * 解析支付宝 JSON 响应并返回原始文本，用于响应验签。
+ * 验签要求使用原始 JSON 子串（不能 parse 后再 stringify）。
+ */
+export async function parseAlipayJsonResponseWithRaw(
+  response: Response,
+): Promise<{ data: Record<string, unknown>; rawText: string }> {
+  const rawBody = Buffer.from(await response.arrayBuffer());
+  const contentType = response.headers.get('content-type') || '';
+  const rawText = decodeAlipayPayload(rawBody, { 'content-type': contentType });
+  return { data: JSON.parse(rawText), rawText };
+}

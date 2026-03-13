@@ -9,8 +9,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'token is required' }, { status: 400 });
   }
 
+  let currentUser: { id: number };
   try {
-    await getCurrentUserByToken(token);
+    currentUser = await getCurrentUserByToken(token);
   } catch {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
@@ -20,6 +21,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!Number.isInteger(userId) || userId <= 0) {
     return NextResponse.json({ error: 'Invalid user id' }, { status: 400 });
+  }
+
+  // 只允许查询自身用户信息，防止 IDOR 用户枚举
+  if (userId !== currentUser.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   try {

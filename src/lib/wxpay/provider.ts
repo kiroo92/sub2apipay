@@ -117,8 +117,9 @@ export class WxpayProvider implements PaymentProvider {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - Number(timestamp)) > 300) {
-      throw new Error('Wechatpay notification timestamp expired');
+    const tsNum = Number(timestamp);
+    if (!Number.isFinite(tsNum) || Math.abs(now - tsNum) > 300) {
+      throw new Error('Wechatpay notification timestamp invalid or expired');
     }
 
     const valid = await verifyNotifySign({ timestamp, nonce, body, serial, signature });

@@ -1,7 +1,7 @@
 import { getEnv } from '@/lib/config';
-import { generateSign } from './sign';
+import { generateSign, verifyResponseSign } from './sign';
 import type { AlipayResponse } from './types';
-import { parseAlipayJsonResponse } from './codec';
+import { parseAlipayJsonResponseWithRaw } from './codec';
 
 const GATEWAY = 'https://openapi.alipay.com/gateway.do';
 
@@ -89,14 +89,20 @@ export async function execute<T extends AlipayResponse>(
     signal: AbortSignal.timeout(10_000),
   });
 
-  const data = await parseAlipayJsonResponse<Record<string, unknown>>(response);
+  const { data, rawText } = await parseAlipayJsonResponseWithRaw(response);
 
   // 支付宝响应格式：{ "alipay_trade_query_response": { ... }, "sign": "..." }
-  // TODO: 实现响应验签 — 需要从原始响应文本中提取 responseKey 对应的 JSON 子串，
-  // 使用 verifySign 配合 ALIPAY_PUBLIC_KEY 验证 data.sign。
-  // 当前未验签是因为需要保留原始响应文本（不能 JSON.parse 后再 stringify），
-  // 需要改造 parseAlipayJsonResponse 同时返回原始文本。
   const responseKey = method.replace(/\./g, '_') + '_response';
+
+  // 响应验签：从原始文本中提取 responseKey 对应的 JSON 子串进行 RSA2 验签
+  const responseSign = data.sign as string | undefined;
+  if (responseSign) {
+    const valid = verifyResponseSign(rawText, responseKey, env.ALIPAY_PUBLIC_KEY, responseSign);
+    if (!valid) {
+      throw new Error(`Alipay API response signature verification failed for ${method}`);
+    }
+  }
+
   const result = data[responseKey] as T | undefined;
 
   if (!result) {

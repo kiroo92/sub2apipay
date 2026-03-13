@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
     const result = await listSubscriptions({
       group_id: groupId ? Number(groupId) : undefined,
       status: status || undefined,
-      page: page ? Number(page) : undefined,
-      page_size: pageSize ? Number(pageSize) : undefined,
+      page: page ? Math.max(1, Number(page)) : undefined,
+      page_size: pageSize ? Math.min(200, Math.max(1, Number(pageSize))) : undefined,
     });
 
     return NextResponse.json({

@@ -17,6 +17,9 @@ function assertWxpayEnv(env: ReturnType<typeof getEnv>) {
       'Wxpay environment variables (WXPAY_APP_ID, WXPAY_MCH_ID, WXPAY_PRIVATE_KEY, WXPAY_API_V3_KEY) are required',
     );
   }
+  if (env.WXPAY_API_V3_KEY.length !== 32) {
+    throw new Error(`WXPAY_API_V3_KEY must be exactly 32 bytes for AES-256-GCM, got ${env.WXPAY_API_V3_KEY.length}`);
+  }
   return env as typeof env & {
     WXPAY_APP_ID: string;
     WXPAY_MCH_ID: string;

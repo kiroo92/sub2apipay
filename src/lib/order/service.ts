@@ -127,84 +127,87 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     throw new OrderError('USER_INACTIVE', message(locale, '用户账号已被禁用', 'User account is disabled'), 422);
   }
 
-  const pendingCount = await prisma.order.count({
-    where: { userId: input.userId, status: ORDER_STATUS.PENDING },
-  });
-  if (pendingCount >= MAX_PENDING_ORDERS) {
-    throw new OrderError(
-      'TOO_MANY_PENDING',
-      message(
-        locale,
-        `待支付订单过多（最多 ${MAX_PENDING_ORDERS} 笔）`,
-        `Too many pending orders (${MAX_PENDING_ORDERS})`,
-      ),
-      429,
-    );
-  }
-
-  // 每日累计充值限额校验（0 = 不限制）
-  if (env.MAX_DAILY_RECHARGE_AMOUNT > 0) {
-    const dailyAgg = await prisma.order.aggregate({
-      where: {
-        userId: input.userId,
-        status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
-        paidAt: { gte: todayStart },
-      },
-      _sum: { amount: true },
-    });
-    const alreadyPaid = Number(dailyAgg._sum.amount ?? 0);
-    if (alreadyPaid + input.amount > env.MAX_DAILY_RECHARGE_AMOUNT) {
-      const remaining = Math.max(0, env.MAX_DAILY_RECHARGE_AMOUNT - alreadyPaid);
-      throw new OrderError(
-        'DAILY_LIMIT_EXCEEDED',
-        message(
-          locale,
-          `今日累计充值已达上限，剩余可充值 ${remaining.toFixed(2)} 元`,
-          `Daily recharge limit reached. Remaining amount: ${remaining.toFixed(2)} CNY`,
-        ),
-        429,
-      );
-    }
-  }
-
-  // 渠道每日全平台限额校验（0 = 不限）
-  const methodDailyLimit = getMethodDailyLimit(input.paymentType);
-  if (methodDailyLimit > 0) {
-    const methodAgg = await prisma.order.aggregate({
-      where: {
-        paymentType: input.paymentType,
-        status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
-        paidAt: { gte: todayStart },
-      },
-      _sum: { amount: true },
-    });
-    const methodUsed = Number(methodAgg._sum.amount ?? 0);
-    if (methodUsed + input.amount > methodDailyLimit) {
-      const remaining = Math.max(0, methodDailyLimit - methodUsed);
-      throw new OrderError(
-        'METHOD_DAILY_LIMIT_EXCEEDED',
-        remaining > 0
-          ? message(
-              locale,
-              `${input.paymentType} 今日剩余额度 ${remaining.toFixed(2)} 元，请减少充值金额或使用其他支付方式`,
-              `${input.paymentType} remaining daily quota: ${remaining.toFixed(2)} CNY. Reduce the amount or use another payment method`,
-            )
-          : message(
-              locale,
-              `${input.paymentType} 今日充值额度已满，请使用其他支付方式`,
-              `${input.paymentType} daily quota is full. Please use another payment method`,
-            ),
-        429,
-      );
-    }
-  }
-
   const feeRate = getMethodFeeRate(input.paymentType);
   const payAmountStr = calculatePayAmount(input.amount, feeRate);
   const payAmountNum = Number(payAmountStr);
 
   const expiresAt = new Date(Date.now() + env.ORDER_TIMEOUT_MINUTES * 60 * 1000);
+
+  // 将限额校验与订单创建放在同一个 serializable 事务中，防止并发突破限额
   const order = await prisma.$transaction(async (tx) => {
+    // 待支付订单数限制
+    const pendingCount = await tx.order.count({
+      where: { userId: input.userId, status: ORDER_STATUS.PENDING },
+    });
+    if (pendingCount >= MAX_PENDING_ORDERS) {
+      throw new OrderError(
+        'TOO_MANY_PENDING',
+        message(
+          locale,
+          `待支付订单过多（最多 ${MAX_PENDING_ORDERS} 笔）`,
+          `Too many pending orders (${MAX_PENDING_ORDERS})`,
+        ),
+        429,
+      );
+    }
+
+    // 每日累计充值限额校验（0 = 不限制）
+    if (env.MAX_DAILY_RECHARGE_AMOUNT > 0) {
+      const dailyAgg = await tx.order.aggregate({
+        where: {
+          userId: input.userId,
+          status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
+          paidAt: { gte: todayStart },
+        },
+        _sum: { amount: true },
+      });
+      const alreadyPaid = Number(dailyAgg._sum.amount ?? 0);
+      if (alreadyPaid + input.amount > env.MAX_DAILY_RECHARGE_AMOUNT) {
+        const remaining = Math.max(0, env.MAX_DAILY_RECHARGE_AMOUNT - alreadyPaid);
+        throw new OrderError(
+          'DAILY_LIMIT_EXCEEDED',
+          message(
+            locale,
+            `今日累计充值已达上限，剩余可充值 ${remaining.toFixed(2)} 元`,
+            `Daily recharge limit reached. Remaining amount: ${remaining.toFixed(2)} CNY`,
+          ),
+          429,
+        );
+      }
+    }
+
+    // 渠道每日全平台限额校验（0 = 不限）
+    const methodDailyLimit = getMethodDailyLimit(input.paymentType);
+    if (methodDailyLimit > 0) {
+      const methodAgg = await tx.order.aggregate({
+        where: {
+          paymentType: input.paymentType,
+          status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
+          paidAt: { gte: todayStart },
+        },
+        _sum: { amount: true },
+      });
+      const methodUsed = Number(methodAgg._sum.amount ?? 0);
+      if (methodUsed + input.amount > methodDailyLimit) {
+        const remaining = Math.max(0, methodDailyLimit - methodUsed);
+        throw new OrderError(
+          'METHOD_DAILY_LIMIT_EXCEEDED',
+          remaining > 0
+            ? message(
+                locale,
+                `${input.paymentType} 今日剩余额度 ${remaining.toFixed(2)} 元，请减少充值金额或使用其他支付方式`,
+                `${input.paymentType} remaining daily quota: ${remaining.toFixed(2)} CNY. Reduce the amount or use another payment method`,
+              )
+            : message(
+                locale,
+                `${input.paymentType} 今日充值额度已满，请使用其他支付方式`,
+                `${input.paymentType} daily quota is full. Please use another payment method`,
+              ),
+          429,
+        );
+      }
+    }
+
     const created = await tx.order.create({
       data: {
         userId: input.userId,
@@ -243,8 +246,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     initPaymentProviders();
     const provider = paymentRegistry.getProvider(input.paymentType);
 
-    const statusAccessToken = createOrderStatusAccessToken(order.id);
-    const orderResultUrl = buildOrderResultUrl(env.NEXT_PUBLIC_APP_URL, order.id);
+    const statusAccessToken = createOrderStatusAccessToken(order.id, input.userId);
+    const orderResultUrl = buildOrderResultUrl(env.NEXT_PUBLIC_APP_URL, order.id, input.userId);
 
     // 只有 easypay 从外部传入 notifyUrl，return_url 统一回到带访问令牌的结果页
     let notifyUrl: string | undefined;
@@ -1002,7 +1005,10 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
             `sub2apipay:refund-rollback:${order.id}`,
           );
         } catch (rollbackError) {
-          // 余额恢复也失败，记录审计日志，需人工介入
+          // 余额恢复也失败，记录审计日志并标记需要补偿，便于定时任务或管理员重试
+          console.error(
+            `[CRITICAL] Refund rollback failed for order ${input.orderId}: balance deducted ${rechargeAmount} but gateway refund and balance restoration both failed. Manual intervention required.`,
+          );
           await prisma.auditLog.create({
             data: {
               orderId: input.orderId,
@@ -1011,6 +1017,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
                 gatewayError: gatewayError instanceof Error ? gatewayError.message : String(gatewayError),
                 rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
                 rechargeAmount,
+                needsBalanceCompensation: true,
               }),
               operator: 'admin',
             },

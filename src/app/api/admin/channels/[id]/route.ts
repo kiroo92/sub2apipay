@@ -1,13 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
 import { prisma } from '@/lib/db';
+
+const updateChannelSchema = z
+  .object({
+    group_id: z.number().int().positive().optional(),
+    name: z.string().min(1).max(100).optional(),
+    platform: z.string().min(1).max(50).optional(),
+    rate_multiplier: z.number().positive().optional(),
+    description: z.string().max(500).nullable().optional(),
+    models: z.array(z.string()).nullable().optional(),
+    features: z.record(z.string(), z.unknown()).nullable().optional(),
+    sort_order: z.number().int().min(0).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await verifyAdminToken(request))) return unauthorizedResponse(request);
 
   try {
     const { id } = await params;
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parsed = updateChannelSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: '参数校验失败' }, { status: 400 });
+    }
+    const body = parsed.data;
 
     const existing = await prisma.channel.findUnique({ where: { id } });
     if (!existing) {
@@ -27,15 +47,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    if (body.rate_multiplier !== undefined && (typeof body.rate_multiplier !== 'number' || body.rate_multiplier <= 0)) {
-      return NextResponse.json({ error: 'rate_multiplier 必须是正数' }, { status: 400 });
-    }
-    if (body.sort_order !== undefined && (!Number.isInteger(body.sort_order) || body.sort_order < 0)) {
-      return NextResponse.json({ error: 'sort_order 必须是非负整数' }, { status: 400 });
-    }
-
     const data: Record<string, unknown> = {};
-    if (body.group_id !== undefined) data.groupId = Number(body.group_id);
+    if (body.group_id !== undefined) data.groupId = body.group_id;
     if (body.name !== undefined) data.name = body.name;
     if (body.platform !== undefined) data.platform = body.platform;
     if (body.rate_multiplier !== undefined) data.rateMultiplier = body.rate_multiplier;

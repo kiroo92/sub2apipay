@@ -259,7 +259,7 @@ describe('EasyPay client', () => {
   });
 
   describe('queryOrder', () => {
-    it('should call GET api.php with correct query parameters', async () => {
+    it('should call POST api.php with correct body parameters', async () => {
       global.fetch = vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
@@ -285,12 +285,14 @@ describe('EasyPay client', () => {
       expect(result.status).toBe(1);
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
-      const [url] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-      expect(url).toContain('https://pay.example.com/api.php');
-      expect(url).toContain('act=order');
-      expect(url).toContain('pid=1001');
-      expect(url).toContain('key=test-merchant-secret-key');
-      expect(url).toContain('out_trade_no=order-001');
+      const [url, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toBe('https://pay.example.com/api.php');
+      expect(init.method).toBe('POST');
+      const body = new URLSearchParams(init.body as string);
+      expect(body.get('act')).toBe('order');
+      expect(body.get('pid')).toBe('1001');
+      expect(body.get('key')).toBe('test-merchant-secret-key');
+      expect(body.get('out_trade_no')).toBe('order-001');
     });
 
     it('should throw when API returns code !== 1', async () => {

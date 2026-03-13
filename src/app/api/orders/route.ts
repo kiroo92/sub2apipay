@@ -11,7 +11,18 @@ const createOrderSchema = z.object({
   amount: z.number().positive().max(99999999.99),
   payment_type: z.string().min(1),
   src_host: z.string().max(253).optional(),
-  src_url: z.string().max(2048).optional(),
+  src_url: z
+    .string()
+    .max(2048)
+    .refine((url) => {
+      try {
+        const protocol = new URL(url).protocol;
+        return protocol === 'http:' || protocol === 'https:';
+      } catch {
+        return false;
+      }
+    }, 'src_url must be a valid HTTP/HTTPS URL')
+    .optional(),
   is_mobile: z.boolean().optional(),
   order_type: z.enum(['balance', 'subscription']).optional(),
   plan_id: z.string().optional(),

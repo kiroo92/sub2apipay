@@ -70,10 +70,21 @@ export class EasyPayProvider implements PaymentProvider {
       throw new Error('EasyPay notification signature verification failed');
     }
 
+    // 校验 pid 与配置一致，防止跨商户回调注入
+    if (params.pid && params.pid !== env.EASY_PAY_PID) {
+      throw new Error(`EasyPay notification pid mismatch: expected ${env.EASY_PAY_PID}, got ${params.pid}`);
+    }
+
+    // 校验金额为有限正数
+    const amount = parseFloat(params.money || '0');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error(`EasyPay notification invalid amount: ${params.money}`);
+    }
+
     return {
       tradeNo: params.trade_no || '',
       orderId: params.out_trade_no || '',
-      amount: parseFloat(params.money || '0'),
+      amount,
       status: params.trade_status === 'TRADE_SUCCESS' ? 'success' : 'failed',
       rawData: params,
     };

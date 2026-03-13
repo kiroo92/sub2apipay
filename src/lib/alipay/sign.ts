@@ -43,6 +43,73 @@ export function generateSign(params: Record<string, string>, privateKey: string)
   return signer.sign(formatPrivateKey(privateKey), 'base64');
 }
 
+/**
+ * 验证支付宝服务端 API 响应签名。
+ * 从原始 JSON 文本中提取 responseKey 对应的子串作为验签内容。
+ */
+export function verifyResponseSign(
+  rawText: string,
+  responseKey: string,
+  alipayPublicKey: string,
+  sign: string,
+): boolean {
+  // 从原始文本中精确提取 responseKey 对应的 JSON 子串
+  // 格式: {"responseKey":{ ... },"sign":"..."}
+  const keyPattern = `"${responseKey}"`;
+  const keyIdx = rawText.indexOf(keyPattern);
+  if (keyIdx < 0) return false;
+
+  const colonIdx = rawText.indexOf(':', keyIdx + keyPattern.length);
+  if (colonIdx < 0) return false;
+
+  // 找到 value 的起始位置（跳过冒号后的空白）
+  let start = colonIdx + 1;
+  while (start < rawText.length && rawText[start] === ' ') start++;
+
+  // 使用括号匹配找到完整的 JSON 值
+  let depth = 0;
+  let end = start;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < rawText.length; i++) {
+    const ch = rawText[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        end = i + 1;
+        break;
+      }
+    }
+  }
+
+  const signContent = rawText.substring(start, end);
+  const pem = formatPublicKey(alipayPublicKey);
+  try {
+    const verifier = crypto.createVerify('RSA-SHA256');
+    verifier.update(signContent);
+    return verifier.verify(pem, sign, 'base64');
+  } catch (err) {
+    if (shouldLogVerifyDebug()) {
+      console.error('[Alipay verifyResponseSign] crypto error:', err);
+    }
+    return false;
+  }
+}
+
 /** 用支付宝公钥验证签名（回调验签：排除 sign 和 sign_type） */
 export function verifySign(params: Record<string, string>, alipayPublicKey: string, sign: string): boolean {
   const filtered = Object.entries(params)

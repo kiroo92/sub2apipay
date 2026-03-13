@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { ORDER_STATUS } from '@/lib/constants';
 
@@ -52,8 +52,13 @@ function createPendingOrder(overrides: Record<string, unknown> = {}) {
 
 describe('GET /pay/[orderId]', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ now: new Date('2026-03-14T12:00:00Z') });
     vi.clearAllMocks();
     mockBuildAlipayPaymentUrl.mockReturnValue('https://openapi.alipay.com/gateway.do?mock=1');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('returns 404 error page when order does not exist', async () => {

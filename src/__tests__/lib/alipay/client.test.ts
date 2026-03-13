@@ -15,6 +15,7 @@ const { mockGenerateSign } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/alipay/sign', () => ({
   generateSign: mockGenerateSign,
+  verifyResponseSign: vi.fn(() => true),
 }));
 
 import { execute, pageExecute } from '@/lib/alipay/client';
