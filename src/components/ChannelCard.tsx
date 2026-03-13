@@ -129,7 +129,7 @@ export default function ChannelCard({ channel, onTopUp, isDark, locale }: Channe
         onClick={onTopUp}
         className={[
           'mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white transition-colors',
-          ps.button,
+          isDark ? ps.button.dark : ps.button.light,
         ].join(' ')}
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
