@@ -11,21 +11,34 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     });
 
-    // 并发检查每个套餐对应的 Sub2API 分组是否仍然存在
+    // 并发检查每个套餐对应的 Sub2API 分组是否仍然存在，并获取分组名称
     const results = await Promise.all(
       plans.map(async (plan) => {
         let groupExists = false;
+        let groupName: string | null = null;
         try {
           const group = await getGroup(plan.groupId);
           groupExists = group !== null;
+          groupName = group?.name ?? null;
         } catch {
           groupExists = false;
         }
         return {
-          ...plan,
+          id: plan.id,
+          groupId: String(plan.groupId),
+          groupName,
+          name: plan.name,
+          description: plan.description,
           price: Number(plan.price),
           originalPrice: plan.originalPrice ? Number(plan.originalPrice) : null,
+          validDays: plan.validityDays,
+          validityUnit: plan.validityUnit,
+          features: plan.features ? JSON.parse(plan.features) : [],
+          sortOrder: plan.sortOrder,
+          enabled: plan.forSale,
           groupExists,
+          createdAt: plan.createdAt,
+          updatedAt: plan.updatedAt,
         };
       }),
     );
@@ -69,7 +82,7 @@ export async function POST(request: NextRequest) {
         originalPrice: original_price ?? null,
         validityDays: validity_days ?? 30,
         validityUnit: ['day', 'week', 'month'].includes(validity_unit) ? validity_unit : 'day',
-        features: features ?? null,
+        features: features ? JSON.stringify(features) : null,
         forSale: for_sale ?? false,
         sortOrder: sort_order ?? 0,
       },
@@ -77,9 +90,20 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        ...plan,
+        id: plan.id,
+        groupId: String(plan.groupId),
+        groupName: null,
+        name: plan.name,
+        description: plan.description,
         price: Number(plan.price),
         originalPrice: plan.originalPrice ? Number(plan.originalPrice) : null,
+        validDays: plan.validityDays,
+        validityUnit: plan.validityUnit,
+        features: plan.features ? JSON.parse(plan.features) : [],
+        sortOrder: plan.sortOrder,
+        enabled: plan.forSale,
+        createdAt: plan.createdAt,
+        updatedAt: plan.updatedAt,
       },
       { status: 201 },
     );

@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.validity_unit !== undefined && ['day', 'week', 'month'].includes(body.validity_unit)) {
       data.validityUnit = body.validity_unit;
     }
-    if (body.features !== undefined) data.features = body.features;
+    if (body.features !== undefined) data.features = body.features ? JSON.stringify(body.features) : null;
     if (body.for_sale !== undefined) data.forSale = body.for_sale;
     if (body.sort_order !== undefined) data.sortOrder = body.sort_order;
 
@@ -47,9 +47,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     return NextResponse.json({
-      ...plan,
+      id: plan.id,
+      groupId: String(plan.groupId),
+      groupName: null,
+      name: plan.name,
+      description: plan.description,
       price: Number(plan.price),
       originalPrice: plan.originalPrice ? Number(plan.originalPrice) : null,
+      validDays: plan.validityDays,
+      validityUnit: plan.validityUnit,
+      features: plan.features ? JSON.parse(plan.features) : [],
+      sortOrder: plan.sortOrder,
+      enabled: plan.forSale,
+      createdAt: plan.createdAt,
+      updatedAt: plan.updatedAt,
     });
   } catch (error) {
     console.error('Failed to update subscription plan:', error);
