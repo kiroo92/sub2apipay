@@ -40,6 +40,13 @@ model Order {
   srcHost       String?     @map("src_host")
   srcUrl        String?     @map("src_url")
 
+  // ── 订单类型 & 订阅相关 ──
+  orderType           String             @default("balance") @map("order_type")
+  planId              String?            @map("plan_id")
+  plan                SubscriptionPlan?  @relation(fields: [planId], references: [id])
+  subscriptionGroupId Int?               @map("subscription_group_id")
+  subscriptionDays    Int?               @map("subscription_days")
+
   auditLogs     AuditLog[]
 
   @@index([userId])
@@ -48,6 +55,7 @@ model Order {
   @@index([createdAt])
   @@index([paidAt])
   @@index([paymentType, paidAt])
+  @@index([orderType])
   @@map("orders")
 }
 
@@ -76,4 +84,56 @@ model AuditLog {
   @@index([orderId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ── 渠道展示配置 ──
+model Channel {
+  id             String   @id @default(cuid())
+  groupId        Int      @unique @map("group_id")
+  name           String
+  platform       String   @default("claude")
+  rateMultiplier Decimal  @db.Decimal(10, 4) @map("rate_multiplier")
+  description    String?  @db.Text
+  models         String?  @db.Text
+  features       String?  @db.Text
+  sortOrder      Int      @default(0) @map("sort_order")
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@map("channels")
+}
+
+// ── 订阅套餐配置 ──
+model SubscriptionPlan {
+  id            String   @id @default(cuid())
+  groupId       Int      @unique @map("group_id")
+  name          String
+  description   String?  @db.Text
+  price         Decimal  @db.Decimal(10, 2)
+  originalPrice Decimal? @db.Decimal(10, 2) @map("original_price")
+  validityDays  Int      @default(30) @map("validity_days")
+  features      String?  @db.Text
+  forSale       Boolean  @default(false) @map("for_sale")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  orders        Order[]
+
+  @@index([forSale, sortOrder])
+  @@map("subscription_plans")
+}
+
+// ── 系统配置 ──
+model SystemConfig {
+  key       String   @id
+  value     String   @db.Text
+  group     String   @default("general")
+  label     String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([group])
+  @@map("system_configs")
 }

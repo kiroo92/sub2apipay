@@ -27,6 +27,8 @@ interface PaymentFormProps {
   pendingBlocked?: boolean;
   pendingCount?: number;
   locale?: Locale;
+  /** 固定金额模式：隐藏金额选择，只显示支付方式和提交按钮 */
+  fixedAmount?: number;
 }
 
 const QUICK_AMOUNTS = [10, 20, 50, 100, 200, 500, 1000, 2000];
@@ -50,10 +52,11 @@ export default function PaymentForm({
   pendingBlocked = false,
   pendingCount = 0,
   locale = 'zh',
+  fixedAmount,
 }: PaymentFormProps) {
-  const [amount, setAmount] = useState<number | ''>('');
+  const [amount, setAmount] = useState<number | ''>(fixedAmount ?? '');
   const [paymentType, setPaymentType] = useState(enabledPaymentTypes[0] || 'alipay');
-  const [customAmount, setCustomAmount] = useState('');
+  const [customAmount, setCustomAmount] = useState(fixedAmount ? String(fixedAmount) : '');
 
   const effectivePaymentType = enabledPaymentTypes.includes(paymentType)
     ? paymentType
@@ -166,60 +169,76 @@ export default function PaymentForm({
         )}
       </div>
 
-      <div>
-        <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
-          {locale === 'en' ? 'Recharge Amount' : '充值金额'}
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          {QUICK_AMOUNTS.filter((val) => val >= minAmount && val <= effectiveMax).map((val) => (
-            <button
-              key={val}
-              type="button"
-              onClick={() => handleQuickAmount(val)}
-              className={`rounded-lg border-2 px-4 py-3 text-center font-medium transition-colors ${
-                amount === val
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : dark
-                    ? 'border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              ¥{val}
-            </button>
-          ))}
+      {fixedAmount ? (
+        <div className={[
+          'rounded-xl border p-4 text-center',
+          dark ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-slate-50',
+        ].join(' ')}>
+          <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+            {locale === 'en' ? 'Recharge Amount' : '充值金额'}
+          </div>
+          <div className={['mt-1 text-3xl font-bold', dark ? 'text-emerald-400' : 'text-emerald-600'].join(' ')}>
+            ¥{fixedAmount.toFixed(2)}
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          <div>
+            <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
+              {locale === 'en' ? 'Recharge Amount' : '充值金额'}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {QUICK_AMOUNTS.filter((val) => val >= minAmount && val <= effectiveMax).map((val) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => handleQuickAmount(val)}
+                  className={`rounded-lg border-2 px-4 py-3 text-center font-medium transition-colors ${
+                    amount === val
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : dark
+                        ? 'border-slate-700 bg-slate-900 text-slate-200 hover:border-slate-500'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  ¥{val}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div>
-        <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
-          {locale === 'en' ? 'Custom Amount' : '自定义金额'}
-        </label>
-        <div className="relative">
-          <span
-            className={['absolute left-3 top-1/2 -translate-y-1/2', dark ? 'text-slate-500' : 'text-gray-400'].join(
-              ' ',
-            )}
-          >
-            ¥
-          </span>
-          <input
-            type="text"
-            inputMode="decimal"
-            step="0.01"
-            min={minAmount}
-            max={effectiveMax}
-            value={customAmount}
-            onChange={(e) => handleCustomAmountChange(e.target.value)}
-            placeholder={`${minAmount} - ${effectiveMax}`}
-            className={[
-              'w-full rounded-lg border py-3 pl-8 pr-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
-              dark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-gray-300 bg-white text-gray-900',
-            ].join(' ')}
-          />
-        </div>
-      </div>
+          <div>
+            <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
+              {locale === 'en' ? 'Custom Amount' : '自定义金额'}
+            </label>
+            <div className="relative">
+              <span
+                className={['absolute left-3 top-1/2 -translate-y-1/2', dark ? 'text-slate-500' : 'text-gray-400'].join(
+                  ' ',
+                )}
+              >
+                ¥
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                step="0.01"
+                min={minAmount}
+                max={effectiveMax}
+                value={customAmount}
+                onChange={(e) => handleCustomAmountChange(e.target.value)}
+                placeholder={`${minAmount} - ${effectiveMax}`}
+                className={[
+                  'w-full rounded-lg border py-3 pl-8 pr-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+                  dark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-gray-300 bg-white text-gray-900',
+                ].join(' ')}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
-      {customAmount !== '' &&
+      {!fixedAmount && customAmount !== '' &&
         !isValid &&
         (() => {
           const num = parseFloat(customAmount);

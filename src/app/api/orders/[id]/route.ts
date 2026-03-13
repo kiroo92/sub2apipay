@@ -29,6 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       expiresAt: true,
       paidAt: true,
       completedAt: true,
+      failedReason: true,
     },
   });
 
@@ -45,5 +46,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     paymentSuccess: derived.paymentSuccess,
     rechargeSuccess: derived.rechargeSuccess,
     rechargeStatus: derived.rechargeStatus,
+    failedReason: order.failedReason ?? null,
   });
 }

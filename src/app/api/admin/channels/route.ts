@@ -1,0 +1,84 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
+import { prisma } from '@/lib/db';
+import { getGroup } from '@/lib/sub2api/client';
+
+export async function GET(request: NextRequest) {
+  if (!(await verifyAdminToken(request))) return unauthorizedResponse(request);
+
+  try {
+    const channels = await prisma.channel.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    // 并发检查每个渠道对应的 Sub2API 分组是否仍然存在
+    const results = await Promise.all(
+      channels.map(async (channel) => {
+        let groupExists = false;
+        try {
+          const group = await getGroup(channel.groupId);
+          groupExists = group !== null;
+        } catch {
+          groupExists = false;
+        }
+        return {
+          ...channel,
+          rateMultiplier: Number(channel.rateMultiplier),
+          groupExists,
+        };
+      }),
+    );
+
+    return NextResponse.json({ channels: results });
+  } catch (error) {
+    console.error('Failed to list channels:', error);
+    return NextResponse.json({ error: '获取渠道列表失败' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  if (!(await verifyAdminToken(request))) return unauthorizedResponse(request);
+
+  try {
+    const body = await request.json();
+    const { group_id, name, platform, rate_multiplier, description, models, features, sort_order, enabled } = body;
+
+    if (!group_id || !name || !platform || rate_multiplier === undefined) {
+      return NextResponse.json({ error: '缺少必填字段: group_id, name, platform, rate_multiplier' }, { status: 400 });
+    }
+
+    // 验证 group_id 唯一性
+    const existing = await prisma.channel.findUnique({
+      where: { groupId: Number(group_id) },
+    });
+
+    if (existing) {
+      return NextResponse.json({ error: `分组 ID ${group_id} 已被渠道「${existing.name}」使用` }, { status: 409 });
+    }
+
+    const channel = await prisma.channel.create({
+      data: {
+        groupId: Number(group_id),
+        name,
+        platform,
+        rateMultiplier: rate_multiplier,
+        description: description ?? null,
+        models: models ?? null,
+        features: features ?? null,
+        sortOrder: sort_order ?? 0,
+        enabled: enabled ?? true,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        ...channel,
+        rateMultiplier: Number(channel.rateMultiplier),
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error('Failed to create channel:', error);
+    return NextResponse.json({ error: '创建渠道失败' }, { status: 500 });
+  }
+}

@@ -1,5 +1,5 @@
 import { getEnv } from '@/lib/config';
-import type { Sub2ApiUser, Sub2ApiRedeemCode } from './types';
+import type { Sub2ApiUser, Sub2ApiRedeemCode, Sub2ApiGroup, Sub2ApiSubscription } from './types';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const RECHARGE_TIMEOUT_MS = 30_000;
@@ -100,6 +100,103 @@ export async function createAndRedeem(
 
   throw lastError instanceof Error ? lastError : new Error('Recharge failed');
 }
+
+// ── 分组 API ──
+
+export async function getAllGroups(): Promise<Sub2ApiGroup[]> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/groups/all`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get groups: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.data ?? []) as Sub2ApiGroup[];
+}
+
+export async function getGroup(groupId: number): Promise<Sub2ApiGroup | null> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/groups/${groupId}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`Failed to get group ${groupId}: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.data as Sub2ApiGroup;
+}
+
+// ── 订阅 API ──
+
+export async function assignSubscription(
+  userId: number,
+  groupId: number,
+  validityDays: number,
+  notes?: string,
+  idempotencyKey?: string,
+): Promise<Sub2ApiSubscription> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/subscriptions/assign`, {
+    method: 'POST',
+    headers: getHeaders(idempotencyKey),
+    body: JSON.stringify({
+      user_id: userId,
+      group_id: groupId,
+      validity_days: validityDays,
+      notes: notes || `Sub2ApiPay subscription order`,
+    }),
+    signal: AbortSignal.timeout(RECHARGE_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Assign subscription failed (${response.status}): ${JSON.stringify(errorData)}`);
+  }
+
+  const data = await response.json();
+  return data.data as Sub2ApiSubscription;
+}
+
+export async function getUserSubscriptions(userId: number): Promise<Sub2ApiSubscription[]> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/users/${userId}/subscriptions`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return [];
+    throw new Error(`Failed to get user subscriptions: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.data ?? []) as Sub2ApiSubscription[];
+}
+
+export async function extendSubscription(subscriptionId: number, days: number): Promise<void> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/subscriptions/${subscriptionId}/extend`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ days }),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Extend subscription failed (${response.status}): ${JSON.stringify(errorData)}`);
+  }
+}
+
+// ── 余额 API ──
 
 export async function subtractBalance(
   userId: number,

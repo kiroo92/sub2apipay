@@ -6,7 +6,7 @@ import { getMethodDailyLimit } from './limits';
 import { getMethodFeeRate, calculatePayAmount } from './fee';
 import { initPaymentProviders, paymentRegistry } from '@/lib/payment';
 import type { PaymentType, PaymentNotification } from '@/lib/payment';
-import { getUser, createAndRedeem, subtractBalance, addBalance } from '@/lib/sub2api/client';
+import { getUser, createAndRedeem, subtractBalance, addBalance, getGroup, assignSubscription } from '@/lib/sub2api/client';
 import { Prisma } from '@prisma/client';
 import { deriveOrderState, isRefundStatus } from './status';
 import { pickLocaleText, type Locale } from '@/lib/locale';
@@ -28,6 +28,9 @@ export interface CreateOrderInput {
   srcHost?: string;
   srcUrl?: string;
   locale?: Locale;
+  // 订阅订单专用
+  orderType?: 'balance' | 'subscription';
+  planId?: string;
 }
 
 export interface CreateOrderResult {
@@ -50,6 +53,31 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   const env = getEnv();
   const locale = input.locale ?? 'zh';
   const todayStart = getBizDayStartUTC();
+  const orderType = input.orderType ?? 'balance';
+
+  // ── 订阅订单前置校验 ──
+  let subscriptionPlan: { id: string; groupId: number; price: Prisma.Decimal; validityDays: number; name: string } | null = null;
+  if (orderType === 'subscription') {
+    if (!input.planId) {
+      throw new OrderError('INVALID_INPUT', message(locale, '订阅订单必须指定套餐', 'Subscription order requires a plan'), 400);
+    }
+    const plan = await prisma.subscriptionPlan.findUnique({ where: { id: input.planId } });
+    if (!plan || !plan.forSale) {
+      throw new OrderError('PLAN_NOT_AVAILABLE', message(locale, '该套餐不存在或未上架', 'Plan not found or not for sale'), 404);
+    }
+    // 校验 Sub2API 分组仍然存在
+    const group = await getGroup(plan.groupId);
+    if (!group || group.status !== 'active') {
+      throw new OrderError(
+        'GROUP_NOT_FOUND',
+        message(locale, '订阅分组已下架，无法购买', 'Subscription group is no longer available'),
+        410,
+      );
+    }
+    subscriptionPlan = plan;
+    // 订阅订单金额使用服务端套餐价格，不信任客户端
+    input.amount = Number(plan.price);
+  }
 
   const user = await getUser(input.userId);
   if (user.status !== 'active') {
@@ -149,6 +177,10 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         clientIp: input.clientIp,
         srcHost: input.srcHost || null,
         srcUrl: input.srcUrl || null,
+        orderType,
+        planId: subscriptionPlan?.id ?? null,
+        subscriptionGroupId: subscriptionPlan?.groupId ?? null,
+        subscriptionDays: subscriptionPlan?.validityDays ?? null,
       },
     });
 
@@ -200,7 +232,13 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       data: {
         orderId: order.id,
         action: 'ORDER_CREATED',
-        detail: JSON.stringify({ userId: input.userId, amount: input.amount, paymentType: input.paymentType }),
+        detail: JSON.stringify({
+          userId: input.userId,
+          amount: input.amount,
+          paymentType: input.paymentType,
+          orderType,
+          ...(subscriptionPlan && { planId: subscriptionPlan.id, planName: subscriptionPlan.name, groupId: subscriptionPlan.groupId }),
+        }),
         operator: `user:${input.userId}`,
       },
     });
@@ -453,10 +491,10 @@ export async function confirmPayment(input: {
     // FAILED 状态 — 之前充值失败，利用重试通知自动重试充值
     if (current.status === ORDER_STATUS.FAILED) {
       try {
-        await executeRecharge(order.id);
+        await executeFulfillment(order.id);
         return true;
       } catch (err) {
-        console.error('Recharge retry failed for order:', order.id, err);
+        console.error('Fulfillment retry failed for order:', order.id, err);
         return false; // 让支付平台继续重试
       }
     }
@@ -485,9 +523,9 @@ export async function confirmPayment(input: {
   });
 
   try {
-    await executeRecharge(order.id);
+    await executeFulfillment(order.id);
   } catch (err) {
-    console.error('Recharge failed for order:', order.id, err);
+    console.error('Fulfillment failed for order:', order.id, err);
     return false;
   }
 
@@ -510,6 +548,107 @@ export async function handlePaymentNotify(notification: PaymentNotification, pro
     paidAmount: notification.amount,
     providerName,
   });
+}
+
+/**
+ * 统一履约入口 — 根据 orderType 分派到余额充值或订阅分配。
+ */
+export async function executeFulfillment(orderId: string): Promise<void> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { orderType: true },
+  });
+  if (!order) throw new OrderError('NOT_FOUND', 'Order not found', 404);
+
+  if (order.orderType === 'subscription') {
+    await executeSubscriptionFulfillment(orderId);
+  } else {
+    await executeRecharge(orderId);
+  }
+}
+
+/**
+ * 订阅履约 — 支付成功后调用 Sub2API 分配订阅。
+ */
+export async function executeSubscriptionFulfillment(orderId: string): Promise<void> {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new OrderError('NOT_FOUND', 'Order not found', 404);
+  if (order.status === ORDER_STATUS.COMPLETED) return;
+  if (isRefundStatus(order.status)) {
+    throw new OrderError('INVALID_STATUS', 'Refund-related order cannot fulfill', 400);
+  }
+  if (order.status !== ORDER_STATUS.PAID && order.status !== ORDER_STATUS.FAILED) {
+    throw new OrderError('INVALID_STATUS', `Order cannot fulfill in status ${order.status}`, 400);
+  }
+  if (!order.subscriptionGroupId || !order.subscriptionDays) {
+    throw new OrderError('INVALID_STATUS', 'Missing subscription info on order', 400);
+  }
+
+  // CAS 锁
+  const lockResult = await prisma.order.updateMany({
+    where: { id: orderId, status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.FAILED] } },
+    data: { status: ORDER_STATUS.RECHARGING },
+  });
+  if (lockResult.count === 0) return;
+
+  try {
+    // 校验分组是否仍然存在
+    const group = await getGroup(order.subscriptionGroupId);
+    if (!group || group.status !== 'active') {
+      throw new Error(`Subscription group ${order.subscriptionGroupId} no longer exists or inactive`);
+    }
+
+    await assignSubscription(
+      order.userId,
+      order.subscriptionGroupId,
+      order.subscriptionDays,
+      `sub2apipay subscription order:${orderId}`,
+      `sub2apipay:subscription:${order.rechargeCode}`,
+    );
+
+    await prisma.order.updateMany({
+      where: { id: orderId, status: ORDER_STATUS.RECHARGING },
+      data: { status: ORDER_STATUS.COMPLETED, completedAt: new Date() },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        orderId,
+        action: 'SUBSCRIPTION_SUCCESS',
+        detail: JSON.stringify({
+          groupId: order.subscriptionGroupId,
+          days: order.subscriptionDays,
+          amount: Number(order.amount),
+        }),
+        operator: 'system',
+      },
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    const isGroupGone = reason.includes('no longer exists');
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: ORDER_STATUS.FAILED,
+        failedAt: new Date(),
+        failedReason: isGroupGone
+          ? `SUBSCRIPTION_GROUP_GONE: ${reason}`
+          : reason,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        orderId,
+        action: 'SUBSCRIPTION_FAILED',
+        detail: reason,
+        operator: 'system',
+      },
+    });
+
+    throw error;
+  }
 }
 
 export async function executeRecharge(orderId: string): Promise<void> {
@@ -698,7 +837,7 @@ export async function retryRecharge(orderId: string, locale: Locale = 'zh'): Pro
     },
   });
 
-  await executeRecharge(orderId);
+  await executeFulfillment(orderId);
 }
 
 export interface RefundInput {

@@ -18,6 +18,7 @@ export interface PublicOrderStatusSnapshot extends DerivedOrderState {
   id: string;
   status: string;
   expiresAt: Date | string;
+  failedReason?: string | null;
 }
 
 export interface OrderDisplayState {
