@@ -684,27 +684,6 @@ function PayContent() {
                     />
                   )}
 
-                  {/* 用户已有订阅 */}
-                  {userSubscriptions.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className={['text-lg font-semibold mb-3', isDark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
-                        {pickLocaleText(locale, '我的订阅', 'My Subscriptions')}
-                      </h3>
-                      <UserSubscriptions
-                        subscriptions={userSubscriptions}
-                        onRenew={(groupId) => {
-                          const plan = plans.find((p) => p.groupId === groupId);
-                          if (plan) {
-                            setSelectedPlan(plan);
-                            setMainTab('subscribe');
-                          }
-                        }}
-                        isDark={isDark}
-                        locale={locale}
-                      />
-                    </div>
-                  )}
-
                   {renderHelpSection()}
                 </div>
               )}
@@ -723,25 +702,28 @@ function PayContent() {
                     ))}
                   </div>
 
-                  {/* 用户已有订阅 */}
-                  {userSubscriptions.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className={['text-lg font-semibold mb-3', isDark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
-                        {pickLocaleText(locale, '我的订阅', 'My Subscriptions')}
-                      </h3>
-                      <UserSubscriptions
-                        subscriptions={userSubscriptions}
-                        onRenew={(groupId) => {
-                          const plan = plans.find((p) => p.groupId === groupId);
-                          if (plan) setSelectedPlan(plan);
-                        }}
-                        isDark={isDark}
-                        locale={locale}
-                      />
-                    </div>
-                  )}
-
                   {renderHelpSection()}
+                </div>
+              )}
+
+              {/* 用户已有订阅 — 所有 tab 共用 */}
+              {userSubscriptions.length > 0 && (
+                <div className="mt-8">
+                  <h3 className={['text-lg font-semibold mb-3', isDark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
+                    {pickLocaleText(locale, '我的订阅', 'My Subscriptions')}
+                  </h3>
+                  <UserSubscriptions
+                    subscriptions={userSubscriptions}
+                    onRenew={(groupId) => {
+                      const plan = plans.find((p) => p.groupId === groupId);
+                      if (plan) {
+                        setSelectedPlan(plan);
+                        setMainTab('subscribe');
+                      }
+                    }}
+                    isDark={isDark}
+                    locale={locale}
+                  />
                 </div>
               )}
 

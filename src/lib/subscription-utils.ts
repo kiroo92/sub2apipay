@@ -39,8 +39,7 @@ export function formatValidityLabel(
     return locale === 'zh' ? `包${value}周` : `${value} Weeks`;
   }
   // day
-  if (value === 30) return locale === 'zh' ? '包月' : 'Monthly';
-  return locale === 'zh' ? `包${value}天` : `${value} Days`;
+  return locale === 'zh' ? `${value}天` : `${value} Days`;
 }
 
 /**
@@ -48,8 +47,7 @@ export function formatValidityLabel(
  * - unit=month, value=1 → /月 / /mo
  * - unit=month, value=3 → /3月 / /3mo
  * - unit=week, value=2 → /2周 / /2wk
- * - unit=day, value=30 → /月 / /mo
- * - unit=day, value=90 → /90天 / /90d
+ * - unit=day, value=30 → /30天 / /30d
  */
 export function formatValiditySuffix(
   value: number,
@@ -65,7 +63,6 @@ export function formatValiditySuffix(
     return locale === 'zh' ? `/${value}周` : `/${value}wk`;
   }
   // day
-  if (value === 30) return locale === 'zh' ? '/月' : '/mo';
   return locale === 'zh' ? `/${value}天` : `/${value}d`;
 }
 
