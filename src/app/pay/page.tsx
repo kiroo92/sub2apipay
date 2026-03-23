@@ -748,7 +748,9 @@ function PayContent() {
                                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                                 <polyline points="17 6 23 6 23 12" />
                               </svg>
-                              <span>{pickLocaleText(locale, '余额适用于全部模型', 'Balance works for all models')}</span>
+                              <span>
+                                {pickLocaleText(locale, '余额适用于全部模型', 'Balance works for all models')}
+                              </span>
                             </div>
                             <div
                               className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(
@@ -838,7 +840,9 @@ function PayContent() {
                         isDark ? 'border-amber-500/25 bg-amber-500/10' : 'border-amber-200 bg-amber-50',
                       ].join(' ')}
                     >
-                      <div className={['text-sm font-semibold', isDark ? 'text-amber-200' : 'text-amber-800'].join(' ')}>
+                      <div
+                        className={['text-sm font-semibold', isDark ? 'text-amber-200' : 'text-amber-800'].join(' ')}
+                      >
                         {pickLocaleText(locale, '套餐说明', 'Plan Notes')}
                       </div>
                       <p className={['mt-2 text-sm leading-6', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>

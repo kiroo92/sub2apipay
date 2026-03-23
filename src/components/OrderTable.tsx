@@ -97,7 +97,9 @@ export default function OrderTable({ isDark, locale, loading, error, orders }: O
                   <div className="font-semibold">¥{order.amount.toFixed(2)}</div>
                   {order.orderType === 'balance' && order.creditAmount ? (
                     <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-                      {locale === 'en' ? `Balance +$${order.creditAmount.toFixed(0)}` : `余额 +$${order.creditAmount.toFixed(0)}`}
+                      {locale === 'en'
+                        ? `Balance +$${order.creditAmount.toFixed(0)}`
+                        : `余额 +$${order.creditAmount.toFixed(0)}`}
                     </div>
                   ) : null}
                 </div>

@@ -35,7 +35,9 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
   const periodLabel = formatValidityLabel(plan.validityDays, unit, locale);
   const periodSuffix = formatValiditySuffix(plan.validityDays, unit, locale);
   const planModelScopes = Array.from(
-    new Set([...(plan.modelScopes ?? []), ...(plan.defaultMappedModel ? [plan.defaultMappedModel] : [])].filter(Boolean)),
+    new Set(
+      [...(plan.modelScopes ?? []), ...(plan.defaultMappedModel ? [plan.defaultMappedModel] : [])].filter(Boolean),
+    ),
   );
 
   const hasLimits =
@@ -118,7 +120,9 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
                 key={model}
                 className={[
                   'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs',
-                  isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-700',
+                  isDark
+                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                    : 'border-amber-200 bg-amber-50 text-amber-700',
                 ].join(' ')}
               >
                 <span className={['h-1.5 w-1.5 rounded-full', isDark ? 'bg-amber-300' : 'bg-amber-500'].join(' ')} />

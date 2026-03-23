@@ -424,7 +424,9 @@ export default function PaymentQRCode({
         </div>
         {(showCreditedBalance || hasFeeDiff) && (
           <div className={['mt-1 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-            {showCreditedBalance ? `${t.creditedBalance}${Number(creditAmount).toFixed(0)}` : `${t.credited}${amount.toFixed(2)}`}
+            {showCreditedBalance
+              ? `${t.creditedBalance}${Number(creditAmount).toFixed(0)}`
+              : `${t.credited}${amount.toFixed(2)}`}
           </div>
         )}
         <div

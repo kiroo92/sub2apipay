@@ -9,8 +9,14 @@ const updateChannelSchema = z.object({
   platform: z.string().min(1).max(50).optional(),
   rate_multiplier: z.number().positive().optional(),
   description: z.string().max(500).nullable().optional(),
-  models: z.union([z.array(z.string()), z.string()]).nullable().optional(),
-  features: z.union([z.record(z.string(), z.unknown()), z.string()]).nullable().optional(),
+  models: z
+    .union([z.array(z.string()), z.string()])
+    .nullable()
+    .optional(),
+  features: z
+    .union([z.record(z.string(), z.unknown()), z.string()])
+    .nullable()
+    .optional(),
   sort_order: z.number().int().min(0).optional(),
   enabled: z.boolean().optional(),
 });

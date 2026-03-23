@@ -92,7 +92,11 @@ export default function ChannelCard({ channel, onTopUp, isDark, locale }: Channe
           isDark ? 'border-slate-700 bg-slate-900/40 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600',
         ].join(' ')}
       >
-        <div className={['text-xs font-medium uppercase tracking-wide', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+        <div
+          className={['text-xs font-medium uppercase tracking-wide', isDark ? 'text-slate-500' : 'text-slate-400'].join(
+            ' ',
+          )}
+        >
           {pickLocaleText(locale, '余额规则', 'Balance Scope')}
         </div>
         <p className="mt-1">

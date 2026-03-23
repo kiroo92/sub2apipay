@@ -179,15 +179,15 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     }
 
     // 每日累计充值限额校验（0 = 不限制）
-      if (env.MAX_DAILY_RECHARGE_AMOUNT > 0) {
-        const dailyAgg = await tx.order.aggregate({
-          where: {
-            userId: input.userId,
-            status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
-            paidAt: { gte: todayStart },
-          },
-          _sum: { payAmount: true },
-        });
+    if (env.MAX_DAILY_RECHARGE_AMOUNT > 0) {
+      const dailyAgg = await tx.order.aggregate({
+        where: {
+          userId: input.userId,
+          status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
+          paidAt: { gte: todayStart },
+        },
+        _sum: { payAmount: true },
+      });
       const alreadyPaid = Number(dailyAgg._sum.payAmount ?? 0);
       if (alreadyPaid + payAmountNum > env.MAX_DAILY_RECHARGE_AMOUNT) {
         const remaining = Math.max(0, env.MAX_DAILY_RECHARGE_AMOUNT - alreadyPaid);
@@ -345,7 +345,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
     return {
       orderId: order.id,
-      amount: isBalanceOrder ? creditAmount ?? input.amount : chargeAmount,
+      amount: isBalanceOrder ? (creditAmount ?? input.amount) : chargeAmount,
       payAmount: payAmountNum,
       creditAmount,
       feeRate,
@@ -809,12 +809,7 @@ export async function executeRecharge(orderId: string): Promise<void> {
 
   try {
     const creditAmount = Number(order.creditAmount ?? order.amount);
-    await createAndRedeem(
-      order.rechargeCode,
-      creditAmount,
-      order.userId,
-      `sub2apipay recharge order:${orderId}`,
-    );
+    await createAndRedeem(order.rechargeCode, creditAmount, order.userId, `sub2apipay recharge order:${orderId}`);
 
     await prisma.order.updateMany({
       where: { id: orderId, status: ORDER_STATUS.RECHARGING },

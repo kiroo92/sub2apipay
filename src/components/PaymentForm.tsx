@@ -163,9 +163,9 @@ export default function PaymentForm({
           dark ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-slate-50',
         ].join(' ')}
       >
-          <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-            {locale === 'en' ? 'Balance Recharge' : '账户余额充值'}
-          </div>
+        <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+          {locale === 'en' ? 'Balance Recharge' : '账户余额充值'}
+        </div>
         <div className={['mt-1 text-base font-medium', dark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
           {userName || (locale === 'en' ? `User #${userId}` : `用户 #${userId}`)}
         </div>
@@ -268,10 +268,7 @@ export default function PaymentForm({
               ? 'Balance amount must be an integer within the allowed range'
               : '充值额度必须为整数，且需在允许范围内';
           if (!isMethodAvailable) {
-            msg =
-              locale === 'en'
-                ? 'The selected payment method is not available right now'
-                : '所选支付方式当前不可用';
+            msg = locale === 'en' ? 'The selected payment method is not available right now' : '所选支付方式当前不可用';
           } else if (!canTopUpWithCurrentMethod) {
             msg =
               locale === 'en'
@@ -296,8 +293,14 @@ export default function PaymentForm({
         ].join(' ')}
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span>{locale === 'en' ? `CNY ${balanceExchangeRate.toFixed(2)} for $1 balance` : `¥${balanceExchangeRate.toFixed(2)}可兑1$余额`}</span>
-          <span>{locale === 'en' ? `Minimum ${minBalanceAmount}$ per top-up` : `单次至少充值 ${minBalanceAmount}$`}</span>
+          <span>
+            {locale === 'en'
+              ? `CNY ${balanceExchangeRate.toFixed(2)} for $1 balance`
+              : `¥${balanceExchangeRate.toFixed(2)}可兑1$余额`}
+          </span>
+          <span>
+            {locale === 'en' ? `Minimum ${minBalanceAmount}$ per top-up` : `单次至少充值 ${minBalanceAmount}$`}
+          </span>
         </div>
       </div>
 
@@ -389,7 +392,11 @@ export default function PaymentForm({
           </div>
           <div className="mt-1 flex items-center justify-between">
             <span>{locale === 'en' ? 'Exchange Rate' : '兑换倍率'}</span>
-            <span>{locale === 'en' ? `CNY ${balanceExchangeRate.toFixed(2)} / $1` : `¥${balanceExchangeRate.toFixed(2)} / 1$`}</span>
+            <span>
+              {locale === 'en'
+                ? `CNY ${balanceExchangeRate.toFixed(2)} / $1`
+                : `¥${balanceExchangeRate.toFixed(2)} / 1$`}
+            </span>
           </div>
           <div className="mt-1 flex items-center justify-between">
             <span>{locale === 'en' ? 'Base Payment' : '基础实付'}</span>

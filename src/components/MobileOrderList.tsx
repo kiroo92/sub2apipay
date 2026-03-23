@@ -123,7 +123,9 @@ export default function MobileOrderList({
               </div>
               {order.orderType === 'balance' && order.creditAmount ? (
                 <div className={['mt-0.5 text-xs', isDark ? 'text-emerald-300' : 'text-emerald-700'].join(' ')}>
-                  {locale === 'en' ? `Balance +$${order.creditAmount.toFixed(0)}` : `余额 +$${order.creditAmount.toFixed(0)}`}
+                  {locale === 'en'
+                    ? `Balance +$${order.creditAmount.toFixed(0)}`
+                    : `余额 +$${order.creditAmount.toFixed(0)}`}
                 </div>
               ) : null}
               <div className={['mt-0.5 text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
