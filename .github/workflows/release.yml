@@ -5,16 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (for example: v1.10.9)'
-        required: true
-        type: string
-      publish_latest:
-        description: 'Also publish the latest image tag'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -26,9 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.vars.outputs.tag }}
-      version: ${{ steps.vars.outputs.version }}
-      major_minor: ${{ steps.vars.outputs.major_minor }}
+      release_name: ${{ steps.vars.outputs.release_name }}
       image: ${{ steps.vars.outputs.image }}
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
       publish_latest: ${{ steps.vars.outputs.publish_latest }}
     steps:
       - uses: actions/checkout@v4
@@ -40,32 +31,34 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="${{ github.event.inputs.tag }}"
-            MANUAL_PUBLISH_LATEST="${{ github.event.inputs.publish_latest }}"
+            TAG="release-$(TZ=Asia/Shanghai date '+%Y%m%d-%H%M%S')"
+            RELEASE_NAME="Release $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')"
+            PUBLISH_LATEST="true"
           else
             TAG="${GITHUB_REF_NAME}"
-            MANUAL_PUBLISH_LATEST="true"
+            RELEASE_NAME="Release $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S CST')"
+            PUBLISH_LATEST="true"
           fi
 
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+          if [[ ! "$TAG" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?|release-[0-9]{8}-[0-9]{6})$ ]]; then
             echo "Invalid release tag: $TAG"
             exit 1
           fi
 
-          VERSION="${TAG#v}"
-          MAJOR_MINOR="$(cut -d. -f1,2 <<<"$VERSION")"
-          IMAGE="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-
-          if [[ "$VERSION" == *-* ]] || [[ "$MANUAL_PUBLISH_LATEST" != "true" ]]; then
-            PUBLISH_LATEST="false"
-          else
-            PUBLISH_LATEST="true"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Release tag already exists: $TAG"
+            exit 1
           fi
 
+          IMAGE="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_TAG="$(echo "$TAG" | tr '[:upper:]' '[:lower:]')"
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "major_minor=$MAJOR_MINOR" >> "$GITHUB_OUTPUT"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "publish_latest=$PUBLISH_LATEST" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
@@ -92,6 +85,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.release_name }}
           target_commitish: ${{ github.sha }}
           body: ${{ steps.changelog.outputs.body }}
           generate_release_notes: false
@@ -119,8 +113,8 @@ jobs:
         run: |
           {
             echo 'tags<<EOF'
-            echo "${{ needs.release.outputs.image }}:${{ needs.release.outputs.version }}"
-            echo "${{ needs.release.outputs.image }}:${{ needs.release.outputs.major_minor }}"
+            echo "${{ needs.release.outputs.image }}:${{ needs.release.outputs.image_tag }}"
+            echo "${{ needs.release.outputs.image }}:sha-${{ needs.release.outputs.short_sha }}"
             if [[ "${{ needs.release.outputs.publish_latest }}" == "true" ]]; then
               echo "${{ needs.release.outputs.image }}:latest"
             fi
