@@ -67,6 +67,22 @@ export default function SubscriptionConfirm({
         <PlanInfoDisplay plan={plan} isDark={isDark} locale={locale} />
       </div>
 
+      <div
+        className={[
+          'rounded-xl border px-4 py-3 text-sm leading-6',
+          isDark ? 'border-amber-500/25 bg-amber-500/10 text-amber-100' : 'border-amber-200 bg-amber-50 text-amber-800',
+        ].join(' ')}
+      >
+        <div className="font-semibold">{pickLocaleText(locale, '套餐规则', 'Plan Rules')}</div>
+        <div className="mt-1">
+          {pickLocaleText(
+            locale,
+            '套餐仅适用于指定模型与端点，需直接支付购买；账户余额不可用于兑换套餐。',
+            'Plans only apply to their specified models and endpoints, must be purchased directly, and cannot be redeemed with account balance.',
+          )}
+        </div>
+      </div>
+
       {/* Payment method selector */}
       <div>
         <label className={['mb-2 block text-sm font-medium', isDark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>

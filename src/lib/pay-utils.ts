@@ -10,6 +10,8 @@ export interface UserInfo {
 export interface MyOrder {
   id: string;
   amount: number;
+  creditAmount?: number | null;
+  orderType?: string;
   status: string;
   paymentType: string;
   createdAt: string;

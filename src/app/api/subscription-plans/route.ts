@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
           limits: groupInfo,
           allowMessagesDispatch: group?.allow_messages_dispatch ?? false,
           defaultMappedModel: group?.default_mapped_model ?? null,
+          modelScopes: group?.supported_model_scopes ?? null,
         };
       }),
     );

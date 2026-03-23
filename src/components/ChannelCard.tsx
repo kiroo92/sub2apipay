@@ -27,7 +27,6 @@ interface ChannelCardProps {
 export default function ChannelCard({ channel, onTopUp, isDark, locale }: ChannelCardProps) {
   const usableQuota = (1 / channel.rateMultiplier).toFixed(2);
   const ps = getPlatformStyle(channel.platform);
-  const tagCls = isDark ? ps.modelTag.dark : ps.modelTag.light;
   const accentCls = isDark ? ps.accent.dark : ps.accent.light;
 
   return (
@@ -44,6 +43,14 @@ export default function ChannelCard({ channel, onTopUp, isDark, locale }: Channe
           <h3 className={['text-lg font-bold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
             {channel.name}
           </h3>
+          <span
+            className={[
+              'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+              isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700',
+            ].join(' ')}
+          >
+            {pickLocaleText(locale, '全部模型可用', 'All models')}
+          </span>
         </div>
 
         {/* Rate display - prominent */}
@@ -79,25 +86,23 @@ export default function ChannelCard({ channel, onTopUp, isDark, locale }: Channe
         )}
       </div>
 
-      {/* Models */}
-      {channel.models.length > 0 && (
-        <div className="mb-4">
-          <p className={['mb-2 text-xs', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
-            {pickLocaleText(locale, '支持模型', 'Supported Models')}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {channel.models.map((model) => (
-              <span
-                key={model}
-                className={['inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs', tagCls].join(' ')}
-              >
-                <span className={['h-1.5 w-1.5 rounded-full', ps.modelTag.dot].join(' ')} />
-                {model}
-              </span>
-            ))}
-          </div>
+      <div
+        className={[
+          'mb-4 rounded-xl border px-3 py-3 text-sm leading-6',
+          isDark ? 'border-slate-700 bg-slate-900/40 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600',
+        ].join(' ')}
+      >
+        <div className={['text-xs font-medium uppercase tracking-wide', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+          {pickLocaleText(locale, '余额规则', 'Balance Scope')}
         </div>
-      )}
+        <p className="mt-1">
+          {pickLocaleText(
+            locale,
+            '这里充值的是通用余额，到账后可用于全部模型按量消费；下方渠道信息仅用于说明倍率与特性，不会限制余额使用范围。',
+            'This top-up adds general balance for pay-as-you-go usage across all models. Channel details below describe rates and features only, not balance restrictions.',
+          )}
+        </p>
+      </div>
 
       {/* Features */}
       {channel.features.length > 0 && (
@@ -136,7 +141,7 @@ export default function ChannelCard({ channel, onTopUp, isDark, locale }: Channe
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
-        {pickLocaleText(locale, '立即充值', 'Top Up Now')}
+        {pickLocaleText(locale, '充值通用余额', 'Top Up Balance')}
       </button>
     </div>
   );

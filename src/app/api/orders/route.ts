@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createOrder } from '@/lib/order/service';
 import { getEnv } from '@/lib/config';
-import { paymentRegistry } from '@/lib/payment';
 import { getEnabledPaymentTypes } from '@/lib/payment/resolve-enabled-types';
 import { getCurrentUserByToken } from '@/lib/sub2api/client';
 import { handleApiError } from '@/lib/utils/api';
@@ -52,12 +51,20 @@ export async function POST(request: NextRequest) {
 
     // 订阅订单跳过金额范围校验（价格由服务端套餐决定）
     if (order_type !== 'subscription') {
-      if (amount < env.MIN_RECHARGE_AMOUNT || amount > env.MAX_RECHARGE_AMOUNT) {
+      if (!Number.isInteger(amount)) {
+        return NextResponse.json({ error: '余额充值额度仅支持整数美元' }, { status: 400 });
+      }
+
+      if (amount < env.MIN_BALANCE_TOPUP_AMOUNT || amount > env.MAX_BALANCE_TOPUP_AMOUNT) {
         return NextResponse.json(
-          { error: `充值金额需在 ${env.MIN_RECHARGE_AMOUNT} - ${env.MAX_RECHARGE_AMOUNT} 之间` },
+          { error: `余额充值额度需在 ${env.MIN_BALANCE_TOPUP_AMOUNT}$ - ${env.MAX_BALANCE_TOPUP_AMOUNT}$ 之间` },
           { status: 400 },
         );
       }
+    }
+
+    if (order_type === 'subscription' && payment_type.trim().toLowerCase() === 'balance') {
+      return NextResponse.json({ error: '套餐需直接支付购买，账户余额不可用于兑换套餐' }, { status: 400 });
     }
 
     // Validate payment type is enabled (registry + ENABLED_PAYMENT_TYPES config)

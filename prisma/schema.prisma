@@ -14,6 +14,7 @@ model Order {
   userNotes     String?     @map("user_notes")
   amount        Decimal     @db.Decimal(10, 2)
   payAmount     Decimal?    @db.Decimal(10, 2) @map("pay_amount")
+  creditAmount  Decimal?    @db.Decimal(10, 2) @map("credit_amount")
   feeRate       Decimal?    @db.Decimal(5, 4)  @map("fee_rate")
   rechargeCode  String      @unique @map("recharge_code")
   status        OrderStatus @default(PENDING)

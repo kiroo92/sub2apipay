@@ -15,13 +15,16 @@ vi.mock('@/lib/payment', () => ({
   initPaymentProviders: vi.fn(),
   paymentRegistry: {
     getDefaultLimit: vi.fn(),
+    getProviderKey: vi.fn(),
   },
 }));
 
+import { prisma } from '@/lib/db';
 import { getEnv } from '@/lib/config';
 import { paymentRegistry } from '@/lib/payment';
-import { getMethodDailyLimit, getMethodSingleLimit } from '@/lib/order/limits';
+import { getMethodDailyLimit, getMethodSingleLimit, queryMethodLimits } from '@/lib/order/limits';
 
+const mockedGroupBy = vi.mocked(prisma.order.groupBy);
 const mockedGetEnv = vi.mocked(getEnv);
 const mockedGetDefaultLimit = vi.mocked(paymentRegistry.getDefaultLimit);
 
@@ -30,6 +33,7 @@ beforeEach(() => {
   // 默认：getEnv 返回无渠道限额字段，provider 无默认值
   mockedGetEnv.mockReturnValue({} as ReturnType<typeof getEnv>);
   mockedGetDefaultLimit.mockReturnValue(undefined);
+  mockedGroupBy.mockResolvedValue([]);
 });
 
 describe('getMethodDailyLimit', () => {
@@ -138,5 +142,31 @@ describe('getMethodSingleLimit', () => {
 
   it('未知支付类型返回 0', () => {
     expect(getMethodSingleLimit('unknown_type')).toBe(0);
+  });
+});
+
+describe('queryMethodLimits', () => {
+  it('uses payAmount totals so returned usage matches server-side limit checks', async () => {
+    mockedGetEnv.mockReturnValue({
+      MAX_DAILY_AMOUNT_ALIPAY: 1000,
+    } as unknown as ReturnType<typeof getEnv>);
+    mockedGroupBy.mockResolvedValue([
+      {
+        paymentType: 'alipay',
+        _sum: {
+          payAmount: 123.45,
+        },
+      },
+    ] as never);
+
+    const result = await queryMethodLimits(['alipay']);
+
+    expect(result.alipay.used).toBe(123.45);
+    expect(result.alipay.remaining).toBe(876.55);
+    expect(mockedGroupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _sum: { payAmount: true },
+      }),
+    );
   });
 });

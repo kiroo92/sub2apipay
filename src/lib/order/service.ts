@@ -48,9 +48,11 @@ export interface CreateOrderResult {
   orderId: string;
   amount: number;
   payAmount: number;
+  creditAmount?: number | null;
   feeRate: number;
   status: string;
   paymentType: PaymentType;
+  orderType: 'balance' | 'subscription';
   userName: string;
   userBalance: number;
   payUrl?: string | null;
@@ -65,6 +67,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   const locale = input.locale ?? 'zh';
   const todayStart = getBizDayStartUTC();
   const orderType = input.orderType ?? 'balance';
+  const isBalanceOrder = orderType === 'balance';
 
   // ── 订阅订单前置校验 ──
   let subscriptionPlan: {
@@ -142,8 +145,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     throw new OrderError('USER_INACTIVE', message(locale, '用户账号已被禁用', 'User account is disabled'), 422);
   }
 
+  const creditAmount = isBalanceOrder ? input.amount : null;
+  const chargeAmount = isBalanceOrder
+    ? Number(
+        new Prisma.Decimal(input.amount.toFixed(2))
+          .mul(new Prisma.Decimal(env.BALANCE_CNY_PER_USD.toString()))
+          .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+          .toFixed(2),
+      )
+    : input.amount;
   const feeRate = getMethodFeeRate(input.paymentType);
-  const payAmountStr = calculatePayAmount(input.amount, feeRate);
+  const payAmountStr = calculatePayAmount(chargeAmount, feeRate);
   const payAmountNum = Number(payAmountStr);
 
   const expiresAt = new Date(Date.now() + env.ORDER_TIMEOUT_MINUTES * 60 * 1000);
@@ -167,17 +179,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     }
 
     // 每日累计充值限额校验（0 = 不限制）
-    if (env.MAX_DAILY_RECHARGE_AMOUNT > 0) {
-      const dailyAgg = await tx.order.aggregate({
-        where: {
-          userId: input.userId,
-          status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
-          paidAt: { gte: todayStart },
-        },
-        _sum: { amount: true },
-      });
-      const alreadyPaid = Number(dailyAgg._sum.amount ?? 0);
-      if (alreadyPaid + input.amount > env.MAX_DAILY_RECHARGE_AMOUNT) {
+      if (env.MAX_DAILY_RECHARGE_AMOUNT > 0) {
+        const dailyAgg = await tx.order.aggregate({
+          where: {
+            userId: input.userId,
+            status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
+            paidAt: { gte: todayStart },
+          },
+          _sum: { payAmount: true },
+        });
+      const alreadyPaid = Number(dailyAgg._sum.payAmount ?? 0);
+      if (alreadyPaid + payAmountNum > env.MAX_DAILY_RECHARGE_AMOUNT) {
         const remaining = Math.max(0, env.MAX_DAILY_RECHARGE_AMOUNT - alreadyPaid);
         throw new OrderError(
           'DAILY_LIMIT_EXCEEDED',
@@ -200,10 +212,10 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
           status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
           paidAt: { gte: todayStart },
         },
-        _sum: { amount: true },
+        _sum: { payAmount: true },
       });
-      const methodUsed = Number(methodAgg._sum.amount ?? 0);
-      if (methodUsed + input.amount > methodDailyLimit) {
+      const methodUsed = Number(methodAgg._sum.payAmount ?? 0);
+      if (methodUsed + payAmountNum > methodDailyLimit) {
         const remaining = Math.max(0, methodDailyLimit - methodUsed);
         throw new OrderError(
           'METHOD_DAILY_LIMIT_EXCEEDED',
@@ -229,8 +241,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         userEmail: user.email,
         userName: user.username,
         userNotes: user.notes || null,
-        amount: new Prisma.Decimal(input.amount.toFixed(2)),
+        amount: new Prisma.Decimal(chargeAmount.toFixed(2)),
         payAmount: new Prisma.Decimal(payAmountStr),
+        creditAmount: creditAmount !== null ? new Prisma.Decimal(creditAmount.toFixed(2)) : null,
         feeRate: feeRate > 0 ? new Prisma.Decimal(feeRate.toFixed(4)) : null,
         rechargeCode: '',
         status: 'PENDING',
@@ -315,7 +328,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         action: 'ORDER_CREATED',
         detail: JSON.stringify({
           userId: input.userId,
-          amount: input.amount,
+          amount: chargeAmount,
+          creditAmount,
+          balanceRate: isBalanceOrder ? env.BALANCE_CNY_PER_USD : null,
           paymentType: input.paymentType,
           orderType,
           ...(subscriptionPlan && {
@@ -330,11 +345,13 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
     return {
       orderId: order.id,
-      amount: input.amount,
+      amount: isBalanceOrder ? creditAmount ?? input.amount : chargeAmount,
       payAmount: payAmountNum,
+      creditAmount,
       feeRate,
       status: ORDER_STATUS.PENDING,
       paymentType: input.paymentType,
+      orderType,
       userName: user.username,
       userBalance: user.balance,
       payUrl: paymentResult.payUrl,
@@ -791,9 +808,10 @@ export async function executeRecharge(orderId: string): Promise<void> {
   }
 
   try {
+    const creditAmount = Number(order.creditAmount ?? order.amount);
     await createAndRedeem(
       order.rechargeCode,
-      Number(order.amount),
+      creditAmount,
       order.userId,
       `sub2apipay recharge order:${orderId}`,
     );
@@ -807,7 +825,11 @@ export async function executeRecharge(orderId: string): Promise<void> {
       data: {
         orderId,
         action: 'RECHARGE_SUCCESS',
-        detail: JSON.stringify({ rechargeCode: order.rechargeCode, amount: Number(order.amount) }),
+        detail: JSON.stringify({
+          rechargeCode: order.rechargeCode,
+          amount: Number(order.amount),
+          creditAmount,
+        }),
         operator: 'system',
       },
     });
@@ -979,7 +1001,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
     );
   }
 
-  const rechargeAmount = Number(order.amount);
+  const rechargeAmount = Number(order.creditAmount ?? order.amount);
   const refundAmount = Number(order.payAmount ?? order.amount);
 
   if (!input.force) {

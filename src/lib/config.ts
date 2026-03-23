@@ -60,6 +60,9 @@ const envSchema = z.object({
   ORDER_TIMEOUT_MINUTES: z.string().default('5').transform(Number).pipe(z.number().int().positive()),
   MIN_RECHARGE_AMOUNT: z.string().default('1').transform(Number).pipe(z.number().positive()),
   MAX_RECHARGE_AMOUNT: z.string().default('1000').transform(Number).pipe(z.number().positive()),
+  BALANCE_CNY_PER_USD: z.string().default('0.2').transform(Number).pipe(z.number().positive()),
+  MIN_BALANCE_TOPUP_AMOUNT: z.string().default('5').transform(Number).pipe(z.number().int().positive()),
+  MAX_BALANCE_TOPUP_AMOUNT: z.string().default('1000').transform(Number).pipe(z.number().int().positive()),
   // 每日每用户最大累计充值额，0 = 不限制
   MAX_DAILY_RECHARGE_AMOUNT: z.string().default('10000').transform(Number).pipe(z.number().min(0)),
 

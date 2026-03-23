@@ -19,8 +19,9 @@ interface PaymentFormProps {
   userBalance?: number;
   enabledPaymentTypes: string[];
   methodLimits?: Record<string, MethodLimitInfo>;
-  minAmount: number;
-  maxAmount: number;
+  minBalanceAmount: number;
+  maxBalanceAmount: number;
+  balanceExchangeRate: number;
   onSubmit: (amount: number, paymentType: string) => Promise<void>;
   loading?: boolean;
   dark?: boolean;
@@ -31,11 +32,11 @@ interface PaymentFormProps {
   fixedAmount?: number;
 }
 
-const QUICK_AMOUNTS = [10, 20, 50, 100, 200, 500, 1000, 2000];
-const AMOUNT_TEXT_PATTERN = /^\d*(\.\d{0,2})?$/;
+const QUICK_AMOUNTS = [5, 10, 20, 50, 100, 200, 500, 1000];
+const INTEGER_TEXT_PATTERN = /^\d*$/;
 
-function hasValidCentPrecision(num: number): boolean {
-  return Math.abs(Math.round(num * 100) - num * 100) < 1e-8;
+function roundMoney(num: number): number {
+  return Math.round(num * 100) / 100;
 }
 
 export default function PaymentForm({
@@ -44,8 +45,9 @@ export default function PaymentForm({
   userBalance,
   enabledPaymentTypes,
   methodLimits,
-  minAmount,
-  maxAmount,
+  minBalanceAmount,
+  maxBalanceAmount,
+  balanceExchangeRate,
   onSubmit,
   loading,
   dark = false,
@@ -68,7 +70,7 @@ export default function PaymentForm({
   };
 
   const handleCustomAmountChange = (val: string) => {
-    if (!AMOUNT_TEXT_PATTERN.test(val)) {
+    if (!INTEGER_TEXT_PATTERN.test(val)) {
       return;
     }
 
@@ -80,7 +82,7 @@ export default function PaymentForm({
     }
 
     const num = parseFloat(val);
-    if (!isNaN(num) && num > 0 && hasValidCentPrecision(num)) {
+    if (!isNaN(num) && num > 0 && Number.isInteger(num)) {
       setAmount(num);
     } else {
       setAmount('');
@@ -90,15 +92,21 @@ export default function PaymentForm({
   const selectedAmount = amount || 0;
   const isMethodAvailable = !methodLimits || methodLimits[effectivePaymentType]?.available !== false;
   const methodSingleMax = methodLimits?.[effectivePaymentType]?.singleMax;
-  const effectiveMax = methodSingleMax !== undefined && methodSingleMax > 0 ? methodSingleMax : maxAmount;
+  const maxByMethod =
+    methodSingleMax !== undefined && methodSingleMax > 0
+      ? Math.floor(methodSingleMax / Math.max(balanceExchangeRate, 0.01))
+      : maxBalanceAmount;
+  const effectiveMax = Math.min(maxBalanceAmount, maxByMethod);
+  const canTopUpWithCurrentMethod = effectiveMax >= minBalanceAmount;
   const feeRate = methodLimits?.[effectivePaymentType]?.feeRate ?? 0;
-  const feeAmount = feeRate > 0 && selectedAmount > 0 ? Math.ceil(((selectedAmount * feeRate) / 100) * 100) / 100 : 0;
-  const payAmount =
-    feeRate > 0 && selectedAmount > 0 ? Math.round((selectedAmount + feeAmount) * 100) / 100 : selectedAmount;
+  const basePayAmount = selectedAmount > 0 ? roundMoney(selectedAmount * balanceExchangeRate) : 0;
+  const feeAmount = feeRate > 0 && basePayAmount > 0 ? Math.ceil(((basePayAmount * feeRate) / 100) * 100) / 100 : 0;
+  const payAmount = feeRate > 0 && basePayAmount > 0 ? roundMoney(basePayAmount + feeAmount) : basePayAmount;
   const isValid =
-    selectedAmount >= minAmount &&
+    canTopUpWithCurrentMethod &&
+    Number.isInteger(selectedAmount) &&
+    selectedAmount >= minBalanceAmount &&
     selectedAmount <= effectiveMax &&
-    hasValidCentPrecision(selectedAmount) &&
     isMethodAvailable;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -155,16 +163,16 @@ export default function PaymentForm({
           dark ? 'border-slate-700 bg-slate-800/80' : 'border-slate-200 bg-slate-50',
         ].join(' ')}
       >
-        <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-          {locale === 'en' ? 'Recharge Account' : '充值账户'}
-        </div>
+          <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+            {locale === 'en' ? 'Balance Recharge' : '账户余额充值'}
+          </div>
         <div className={['mt-1 text-base font-medium', dark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
           {userName || (locale === 'en' ? `User #${userId}` : `用户 #${userId}`)}
         </div>
         {userBalance !== undefined && (
           <div className={['mt-1 text-sm', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
             {locale === 'en' ? 'Current Balance:' : '当前余额:'}{' '}
-            <span className="font-medium text-green-600">{userBalance.toFixed(2)}</span>
+            <span className="font-medium text-green-600">${userBalance.toFixed(2)}</span>
           </div>
         )}
       </div>
@@ -177,20 +185,20 @@ export default function PaymentForm({
           ].join(' ')}
         >
           <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-            {locale === 'en' ? 'Recharge Amount' : '充值金额'}
+            {locale === 'en' ? 'Balance Amount' : '充值额度'}
           </div>
           <div className={['mt-1 text-3xl font-bold', dark ? 'text-emerald-400' : 'text-emerald-600'].join(' ')}>
-            ¥{fixedAmount.toFixed(2)}
+            ${fixedAmount.toFixed(0)}
           </div>
         </div>
       ) : (
         <>
           <div>
             <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
-              {locale === 'en' ? 'Recharge Amount' : '充值金额'}
+              {locale === 'en' ? 'Balance Amount (USD)' : '充值额度（单位：$）'}
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {QUICK_AMOUNTS.filter((val) => val >= minAmount && val <= effectiveMax).map((val) => (
+              {QUICK_AMOUNTS.filter((val) => val >= minBalanceAmount && val <= effectiveMax).map((val) => (
                 <button
                   key={val}
                   type="button"
@@ -205,7 +213,7 @@ export default function PaymentForm({
                         : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  ¥{val}
+                  ${val}
                 </button>
               ))}
             </div>
@@ -213,7 +221,7 @@ export default function PaymentForm({
 
           <div>
             <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
-              {locale === 'en' ? 'Custom Amount' : '自定义金额'}
+              {locale === 'en' ? 'Custom Balance Amount' : '自定义额度'}
             </label>
             <div className="relative">
               <span
@@ -221,17 +229,17 @@ export default function PaymentForm({
                   ' ',
                 )}
               >
-                ¥
+                $
               </span>
               <input
                 type="text"
-                inputMode="decimal"
-                step="0.01"
-                min={minAmount}
-                max={effectiveMax}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={customAmount}
                 onChange={(e) => handleCustomAmountChange(e.target.value)}
-                placeholder={`${minAmount} - ${effectiveMax}`}
+                placeholder={
+                  canTopUpWithCurrentMethod ? `${minBalanceAmount} - ${effectiveMax}` : `${minBalanceAmount}+`
+                }
                 className={[
                   'w-full rounded-lg border py-3 pl-8 pr-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
                   dark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-gray-300 bg-white text-gray-900',
@@ -242,6 +250,14 @@ export default function PaymentForm({
         </>
       )}
 
+      {!fixedAmount && isMethodAvailable && !canTopUpWithCurrentMethod && (
+        <div className={['text-xs', dark ? 'text-amber-300' : 'text-amber-700'].join(' ')}>
+          {locale === 'en'
+            ? 'The selected payment method limit is below the minimum top-up. Please switch to another method.'
+            : '所选支付方式单笔上限低于最低充值金额，请切换其他支付方式'}
+        </div>
+      )}
+
       {!fixedAmount &&
         customAmount !== '' &&
         !isValid &&
@@ -249,16 +265,41 @@ export default function PaymentForm({
           const num = parseFloat(customAmount);
           let msg =
             locale === 'en'
-              ? 'Amount must be within range and support up to 2 decimal places'
-              : '金额需在范围内，且最多支持 2 位小数（精确到分）';
-          if (!isNaN(num)) {
-            if (num < minAmount)
-              msg = locale === 'en' ? `Minimum per transaction: ¥${minAmount}` : `单笔最低充值 ¥${minAmount}`;
-            else if (num > effectiveMax)
-              msg = locale === 'en' ? `Maximum per transaction: ¥${effectiveMax}` : `单笔最高充值 ¥${effectiveMax}`;
+              ? 'Balance amount must be an integer within the allowed range'
+              : '充值额度必须为整数，且需在允许范围内';
+          if (!isMethodAvailable) {
+            msg =
+              locale === 'en'
+                ? 'The selected payment method is not available right now'
+                : '所选支付方式当前不可用';
+          } else if (!canTopUpWithCurrentMethod) {
+            msg =
+              locale === 'en'
+                ? 'The selected payment method limit is below the minimum top-up'
+                : '所选支付方式单笔上限低于最低充值金额';
+          } else if (!isNaN(num)) {
+            if (!Number.isInteger(num)) {
+              msg = locale === 'en' ? 'Only whole-dollar amounts are allowed' : '仅支持整数美元充值';
+            } else if (num < minBalanceAmount) {
+              msg = locale === 'en' ? `Minimum top-up: $${minBalanceAmount}` : `单次至少充值 ${minBalanceAmount}$`;
+            } else if (num > effectiveMax) {
+              msg = locale === 'en' ? `Maximum top-up: $${effectiveMax}` : `单次最高充值 ${effectiveMax}$`;
+            }
           }
           return <div className={['text-xs', dark ? 'text-amber-300' : 'text-amber-700'].join(' ')}>{msg}</div>;
         })()}
+
+      <div
+        className={[
+          'rounded-xl border px-4 py-3 text-sm',
+          dark ? 'border-slate-700 bg-slate-800/60 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600',
+        ].join(' ')}
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span>{locale === 'en' ? `CNY ${balanceExchangeRate.toFixed(2)} for $1 balance` : `¥${balanceExchangeRate.toFixed(2)}可兑1$余额`}</span>
+          <span>{locale === 'en' ? `Minimum ${minBalanceAmount}$ per top-up` : `单次至少充值 ${minBalanceAmount}$`}</span>
+        </div>
+      </div>
 
       {enabledPaymentTypes.length > 1 && (
         <div>
@@ -335,7 +376,7 @@ export default function PaymentForm({
         </div>
       )}
 
-      {feeRate > 0 && selectedAmount > 0 && (
+      {selectedAmount > 0 && (
         <div
           className={[
             'rounded-xl border px-4 py-3 text-sm',
@@ -343,21 +384,31 @@ export default function PaymentForm({
           ].join(' ')}
         >
           <div className="flex items-center justify-between">
-            <span>{locale === 'en' ? 'Recharge Amount' : '充值金额'}</span>
-            <span>¥{selectedAmount.toFixed(2)}</span>
+            <span>{locale === 'en' ? 'Balance Credit' : '充值额度'}</span>
+            <span>${selectedAmount.toFixed(0)}</span>
           </div>
           <div className="mt-1 flex items-center justify-between">
-            <span>{locale === 'en' ? `Fee (${feeRate}%)` : `手续费（${feeRate}%）`}</span>
-            <span>¥{feeAmount.toFixed(2)}</span>
+            <span>{locale === 'en' ? 'Exchange Rate' : '兑换倍率'}</span>
+            <span>{locale === 'en' ? `CNY ${balanceExchangeRate.toFixed(2)} / $1` : `¥${balanceExchangeRate.toFixed(2)} / 1$`}</span>
           </div>
+          <div className="mt-1 flex items-center justify-between">
+            <span>{locale === 'en' ? 'Base Payment' : '基础实付'}</span>
+            <span>¥{basePayAmount.toFixed(2)}</span>
+          </div>
+          {feeRate > 0 && (
+            <div className="mt-1 flex items-center justify-between">
+              <span>{locale === 'en' ? `Fee (${feeRate}%)` : `手续费（${feeRate}%）`}</span>
+              <span>¥{feeAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div
             className={[
               'mt-1.5 flex items-center justify-between border-t pt-1.5 font-medium',
               dark ? 'border-slate-700 text-slate-100' : 'border-slate-200 text-slate-900',
             ].join(' ')}
           >
-            <span>{locale === 'en' ? 'Amount to Pay' : '实付金额'}</span>
-            <span>¥{payAmount.toFixed(2)}</span>
+            <span>{locale === 'en' ? 'Amount to Pay' : '实付'}</span>
+            <span>{locale === 'en' ? `CNY ${payAmount.toFixed(2)}` : `${payAmount.toFixed(2)}元`}</span>
           </div>
         </div>
       )}
@@ -395,8 +446,8 @@ export default function PaymentForm({
               ? 'Too many pending orders'
               : '待支付订单过多'
             : locale === 'en'
-              ? `Recharge Now ¥${(feeRate > 0 && selectedAmount > 0 ? payAmount : selectedAmount || 0).toFixed(2)}`
-              : `立即充值 ¥${(feeRate > 0 && selectedAmount > 0 ? payAmount : selectedAmount || 0).toFixed(2)}`}
+              ? `Recharge Now CNY ${payAmount.toFixed(2)}`
+              : `立即充值 ¥${payAmount.toFixed(2)}`}
       </button>
     </form>
   );

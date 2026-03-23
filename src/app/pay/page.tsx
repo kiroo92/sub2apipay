@@ -25,8 +25,10 @@ interface OrderResult {
   orderId: string;
   amount: number;
   payAmount?: number;
+  creditAmount?: number | null;
   status: string;
   paymentType: string;
+  orderType?: 'balance' | 'subscription';
   payUrl?: string | null;
   qrCode?: string | null;
   clientSecret?: string | null;
@@ -36,8 +38,9 @@ interface OrderResult {
 
 interface AppConfig {
   enabledPaymentTypes: string[];
-  minAmount: number;
-  maxAmount: number;
+  balanceExchangeRate: number;
+  minBalanceAmount: number;
+  maxBalanceAmount: number;
   maxDailyAmount: number;
   methodLimits?: Record<string, MethodLimitInfo>;
   helpImageUrl?: string | null;
@@ -86,8 +89,9 @@ function PayContent() {
 
   const [config, setConfig] = useState<AppConfig>({
     enabledPaymentTypes: [],
-    minAmount: 1,
-    maxAmount: 1000,
+    balanceExchangeRate: 0.2,
+    minBalanceAmount: 5,
+    maxBalanceAmount: 1000,
     maxDailyAmount: 0,
   });
   const [userNotFound, setUserNotFound] = useState(false);
@@ -204,8 +208,9 @@ function PayContent() {
         if (cfgData.config) {
           setConfig({
             enabledPaymentTypes: cfgData.config.enabledPaymentTypes ?? ['alipay', 'wxpay'],
-            minAmount: cfgData.config.minAmount ?? 1,
-            maxAmount: cfgData.config.maxAmount ?? 1000,
+            balanceExchangeRate: cfgData.config.balanceExchangeRate ?? 0.2,
+            minBalanceAmount: cfgData.config.minBalanceAmount ?? 5,
+            maxBalanceAmount: cfgData.config.maxBalanceAmount ?? 1000,
             maxDailyAmount: cfgData.config.maxDailyAmount ?? 0,
             methodLimits: cfgData.config.methodLimits,
             helpImageUrl: cfgData.config.helpImageUrl ?? null,
@@ -409,8 +414,10 @@ function PayContent() {
         orderId: data.orderId,
         amount: data.amount,
         payAmount: data.payAmount,
+        creditAmount: data.creditAmount ?? null,
         status: data.status,
         paymentType: data.paymentType || paymentType,
+        orderType: data.orderType || 'balance',
         payUrl: data.payUrl,
         qrCode: data.qrCode,
         clientSecret: data.clientSecret,
@@ -457,8 +464,10 @@ function PayContent() {
         orderId: data.orderId,
         amount: data.amount,
         payAmount: data.payAmount,
+        creditAmount: data.creditAmount ?? null,
         status: data.status,
         paymentType: data.paymentType || paymentType,
+        orderType: data.orderType || 'subscription',
         payUrl: data.payUrl,
         qrCode: data.qrCode,
         clientSecret: data.clientSecret,
@@ -494,10 +503,14 @@ function PayContent() {
   const allEntriesClosed = channelsLoaded && userLoaded && !canTopUp && !hasPlans;
   const showMainTabs = channelsLoaded && userLoaded && !allEntriesClosed && (hasChannels || hasPlans);
   const pageTitle = showMainTabs
-    ? pickLocaleText(locale, '选择适合你的 充值/订阅服务', 'Choose Your Recharge / Subscription')
+    ? pickLocaleText(locale, '选择余额充值或指定模型套餐', 'Choose Balance Top-Up or a Model-Specific Plan')
     : pickLocaleText(locale, 'Sub2API 余额充值', 'Sub2API Balance Recharge');
   const pageSubtitle = showMainTabs
-    ? pickLocaleText(locale, '充值余额或者订阅套餐', 'Top up balance or subscribe to a plan')
+    ? pickLocaleText(
+        locale,
+        '余额可用于全部模型；套餐仅适用于指定模型，且不能用余额兑换',
+        'Balance works across all models; plans are model-specific and cannot be redeemed with balance',
+      )
     : pickLocaleText(locale, '安全支付，自动到账', 'Secure payment, automatic crediting');
 
   return (
@@ -682,8 +695,8 @@ function PayContent() {
                       className={[
                         'mb-6 rounded-2xl border p-6',
                         isDark
-                          ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-purple-500/10'
-                          : 'border-emerald-500/20 bg-gradient-to-r from-emerald-50 to-purple-50',
+                          ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10'
+                          : 'border-emerald-500/20 bg-gradient-to-r from-emerald-50 to-cyan-50',
                       ].join(' ')}
                     >
                       <div className="flex items-start gap-4">
@@ -715,8 +728,8 @@ function PayContent() {
                           <p className={['text-sm mb-4', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
                             {pickLocaleText(
                               locale,
-                              '无需订阅，充值即用，按实际消耗扣费。余额所有渠道通用，可自由切换。价格以美元计价（当前比例：1美元≈1人民币）',
-                              'No subscription needed. Top up and use. Charged by actual usage. Balance works across all channels. Priced in USD (current rate: 1 USD ≈ 1 CNY)',
+                              `充值后到账的是通用美元余额，可用于全部模型与可用端点的按量消费。当前汇率为 ¥${config.balanceExchangeRate.toFixed(2)} 可兑 1$ 余额，且仅支持整数充值，最低 ${config.minBalanceAmount}$。`,
+                              `Top-ups add general USD balance for pay-as-you-go usage across all models and available endpoints. Current rate is CNY ${config.balanceExchangeRate.toFixed(2)} for $1 balance, with whole-dollar top-ups only and a minimum of $${config.minBalanceAmount}.`,
                             )}
                           </p>
                           <div className="flex flex-wrap gap-4 text-sm">
@@ -735,7 +748,7 @@ function PayContent() {
                                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
                                 <polyline points="17 6 23 6 23 12" />
                               </svg>
-                              <span>{pickLocaleText(locale, '倍率越低越划算', 'Lower rate = better value')}</span>
+                              <span>{pickLocaleText(locale, '余额适用于全部模型', 'Balance works for all models')}</span>
                             </div>
                             <div
                               className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(
@@ -754,8 +767,30 @@ function PayContent() {
                               <span>
                                 {pickLocaleText(
                                   locale,
-                                  '0.15倍率 = 1元可用约6.67美元额度',
-                                  '0.15 rate = 1 CNY ≈ $6.67 quota',
+                                  `¥${config.balanceExchangeRate.toFixed(2)}可兑1$余额`,
+                                  `CNY ${config.balanceExchangeRate.toFixed(2)} for $1 balance`,
+                                )}
+                              </span>
+                            </div>
+                            <div
+                              className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(
+                                ' ',
+                              )}
+                            >
+                              <svg
+                                className="h-4 w-4 text-cyan-500"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M7 12h10M9 17h6" />
+                              </svg>
+                              <span>
+                                {pickLocaleText(
+                                  locale,
+                                  `仅支持整数充值，单次至少 ${config.minBalanceAmount}$`,
+                                  `Whole-dollar top-ups only, minimum $${config.minBalanceAmount}`,
                                 )}
                               </span>
                             </div>
@@ -779,8 +814,9 @@ function PayContent() {
                         userBalance={userInfo?.balance}
                         enabledPaymentTypes={config.enabledPaymentTypes}
                         methodLimits={config.methodLimits}
-                        minAmount={config.minAmount}
-                        maxAmount={config.maxAmount}
+                        minBalanceAmount={config.minBalanceAmount}
+                        maxBalanceAmount={config.maxBalanceAmount}
+                        balanceExchangeRate={config.balanceExchangeRate}
                         onSubmit={handleSubmit}
                         loading={loading}
                         dark={isDark}
@@ -796,6 +832,23 @@ function PayContent() {
 
                 {mainTab === 'subscribe' && (
                   <div className="mt-6">
+                    <div
+                      className={[
+                        'mb-6 rounded-2xl border p-5',
+                        isDark ? 'border-amber-500/25 bg-amber-500/10' : 'border-amber-200 bg-amber-50',
+                      ].join(' ')}
+                    >
+                      <div className={['text-sm font-semibold', isDark ? 'text-amber-200' : 'text-amber-800'].join(' ')}>
+                        {pickLocaleText(locale, '套餐说明', 'Plan Notes')}
+                      </div>
+                      <p className={['mt-2 text-sm leading-6', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
+                        {pickLocaleText(
+                          locale,
+                          '套餐是指定模型/端点的固定权益，只能用于套餐列出的范围；套餐需直接支付购买，账户余额不能抵扣或兑换套餐。',
+                          'Plans grant fixed access to specific models/endpoints only. They must be purchased directly and account balance cannot be applied or redeemed for them.',
+                        )}
+                      </p>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {plans.map((plan) => (
                         <SubscriptionPlanCard
@@ -861,8 +914,9 @@ function PayContent() {
                 userBalance={userInfo?.balance}
                 enabledPaymentTypes={config.enabledPaymentTypes}
                 methodLimits={config.methodLimits}
-                minAmount={config.minAmount}
-                maxAmount={config.maxAmount}
+                minBalanceAmount={config.minBalanceAmount}
+                maxBalanceAmount={config.maxBalanceAmount}
+                balanceExchangeRate={config.balanceExchangeRate}
                 onSubmit={handleSubmit}
                 loading={loading}
                 dark={isDark}
@@ -901,8 +955,9 @@ function PayContent() {
                     userBalance={userInfo?.balance}
                     enabledPaymentTypes={config.enabledPaymentTypes}
                     methodLimits={config.methodLimits}
-                    minAmount={config.minAmount}
-                    maxAmount={config.maxAmount}
+                    minBalanceAmount={config.minBalanceAmount}
+                    maxBalanceAmount={config.maxBalanceAmount}
+                    balanceExchangeRate={config.balanceExchangeRate}
                     onSubmit={handleSubmit}
                     loading={loading}
                     dark={isDark}
@@ -931,8 +986,9 @@ function PayContent() {
                       userBalance={userInfo?.balance}
                       enabledPaymentTypes={config.enabledPaymentTypes}
                       methodLimits={config.methodLimits}
-                      minAmount={config.minAmount}
-                      maxAmount={config.maxAmount}
+                      minBalanceAmount={config.minBalanceAmount}
+                      maxBalanceAmount={config.maxBalanceAmount}
+                      balanceExchangeRate={config.balanceExchangeRate}
                       onSubmit={handleSubmit}
                       loading={loading}
                       dark={isDark}
@@ -1035,6 +1091,8 @@ function PayContent() {
             paymentType={orderResult.paymentType}
             amount={orderResult.amount}
             payAmount={orderResult.payAmount}
+            creditAmount={orderResult.creditAmount}
+            orderType={orderResult.orderType}
             expiresAt={orderResult.expiresAt}
             statusAccessToken={orderResult.statusAccessToken}
             onStatusChange={handleStatusChange}

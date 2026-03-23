@@ -93,7 +93,14 @@ export default function OrderTable({ isDark, locale, loading, error, orders }: O
                 ].join(' ')}
               >
                 <div className="font-medium">#{order.id.slice(0, 12)}</div>
-                <div className="font-semibold">¥{order.amount.toFixed(2)}</div>
+                <div>
+                  <div className="font-semibold">¥{order.amount.toFixed(2)}</div>
+                  {order.orderType === 'balance' && order.creditAmount ? (
+                    <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                      {locale === 'en' ? `Balance +$${order.creditAmount.toFixed(0)}` : `余额 +$${order.creditAmount.toFixed(0)}`}
+                    </div>
+                  ) : null}
+                </div>
                 <div>{getPaymentDisplayInfo(order.paymentType, locale).channel}</div>
                 <div>
                   <span

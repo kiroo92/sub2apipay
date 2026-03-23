@@ -26,6 +26,7 @@ export interface PlanInfo {
   } | null;
   allowMessagesDispatch: boolean;
   defaultMappedModel: string | null;
+  modelScopes?: string[] | null;
 }
 
 /** 套餐信息展示（Header + 价格 + 描述 + 倍率/限额 + 特性），不含操作按钮 */
@@ -33,6 +34,9 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
   const unit = plan.validityUnit ?? 'day';
   const periodLabel = formatValidityLabel(plan.validityDays, unit, locale);
   const periodSuffix = formatValiditySuffix(plan.validityDays, unit, locale);
+  const planModelScopes = Array.from(
+    new Set([...(plan.modelScopes ?? []), ...(plan.defaultMappedModel ? [plan.defaultMappedModel] : [])].filter(Boolean)),
+  );
 
   const hasLimits =
     plan.limits &&
@@ -58,6 +62,14 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
             ].join(' ')}
           >
             {periodLabel}
+          </span>
+          <span
+            className={[
+              'rounded-full px-2.5 py-0.5 text-xs font-medium',
+              isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700',
+            ].join(' ')}
+          >
+            {pickLocaleText(locale, '指定模型', 'Specific models')}
           </span>
           {isOpenAI && plan.allowMessagesDispatch && (
             <span
@@ -93,6 +105,28 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
         <p className={['mb-4 text-sm leading-relaxed', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
           {plan.description}
         </p>
+      )}
+
+      {planModelScopes.length > 0 && (
+        <div className="mb-4">
+          <p className={['mb-2 text-xs', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+            {pickLocaleText(locale, '可用模型', 'Included Models')}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {planModelScopes.map((model) => (
+              <span
+                key={model}
+                className={[
+                  'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs',
+                  isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-amber-200 bg-amber-50 text-amber-700',
+                ].join(' ')}
+              >
+                <span className={['h-1.5 w-1.5 rounded-full', isDark ? 'bg-amber-300' : 'bg-amber-500'].join(' ')} />
+                {model}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Rate + Limits grid */}
@@ -164,6 +198,19 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
           </div>
         </div>
       )}
+
+      <div
+        className={[
+          'rounded-xl border px-3 py-3 text-sm leading-6',
+          isDark ? 'border-slate-700 bg-slate-900/40 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600',
+        ].join(' ')}
+      >
+        {pickLocaleText(
+          locale,
+          '套餐仅限指定模型/端点使用，不能使用账户余额兑换。',
+          'This plan only works for its listed models/endpoints and cannot be redeemed using account balance.',
+        )}
+      </div>
     </>
   );
 }

@@ -37,6 +37,9 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           amount: true,
+          creditAmount: true,
+          orderType: true,
+          payAmount: true,
           status: true,
           paymentType: true,
           createdAt: true,
@@ -62,7 +65,9 @@ export async function GET(request: NextRequest) {
         const derived = deriveOrderState(item);
         return {
           id: item.id,
-          amount: Number(item.amount),
+          amount: Number(item.payAmount ?? item.amount),
+          creditAmount: item.creditAmount ? Number(item.creditAmount) : null,
+          orderType: item.orderType,
           status: item.status,
           paymentType: item.paymentType,
           createdAt: item.createdAt,

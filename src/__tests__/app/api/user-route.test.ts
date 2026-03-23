@@ -16,6 +16,9 @@ vi.mock('@/lib/config', () => ({
   getEnv: () => ({
     MIN_RECHARGE_AMOUNT: 1,
     MAX_RECHARGE_AMOUNT: 1000,
+    BALANCE_CNY_PER_USD: 0.2,
+    MIN_BALANCE_TOPUP_AMOUNT: 5,
+    MAX_BALANCE_TOPUP_AMOUNT: 1000,
     MAX_DAILY_RECHARGE_AMOUNT: 10000,
     PAY_HELP_IMAGE_URL: undefined,
     PAY_HELP_TEXT: undefined,

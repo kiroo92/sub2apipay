@@ -68,10 +68,10 @@ export async function queryMethodLimits(paymentTypes: string[]): Promise<Record<
       status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
       paidAt: { gte: todayStart },
     },
-    _sum: { amount: true },
+    _sum: { payAmount: true },
   });
 
-  const usageMap = Object.fromEntries(usageRows.map((row) => [row.paymentType, Number(row._sum.amount ?? 0)]));
+  const usageMap = Object.fromEntries(usageRows.map((row) => [row.paymentType, Number(row._sum.payAmount ?? 0)]));
 
   const result: Record<string, MethodLimitStatus> = {};
   for (const type of paymentTypes) {

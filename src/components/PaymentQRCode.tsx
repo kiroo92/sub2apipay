@@ -18,6 +18,8 @@ interface PaymentQRCodeProps {
   paymentType?: string;
   amount: number;
   payAmount?: number;
+  creditAmount?: number | null;
+  orderType?: 'balance' | 'subscription';
   expiresAt: string;
   statusAccessToken?: string;
   onStatusChange: (status: PublicOrderStatusSnapshot) => void;
@@ -42,6 +44,8 @@ export default function PaymentQRCode({
   paymentType,
   amount,
   payAmount: payAmountProp,
+  creditAmount,
+  orderType = 'balance',
   expiresAt,
   statusAccessToken,
   onStatusChange,
@@ -52,6 +56,7 @@ export default function PaymentQRCode({
   locale = 'zh',
 }: PaymentQRCodeProps) {
   const displayAmount = payAmountProp ?? amount;
+  const showCreditedBalance = orderType === 'balance' && creditAmount !== undefined && creditAmount !== null;
   const hasFeeDiff = payAmountProp !== undefined && payAmountProp !== amount;
   const [timeLeft, setTimeLeft] = useState('');
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(Infinity);
@@ -90,6 +95,7 @@ export default function PaymentQRCode({
         : '该订单已支付完成，无法取消。充值将自动到账。',
     backToRecharge: locale === 'en' ? 'Back to Recharge' : '返回充值',
     credited: locale === 'en' ? 'Credited ¥' : '到账 ¥',
+    creditedBalance: locale === 'en' ? 'Balance +$' : '到账余额 $',
     stripeLoadFailed:
       locale === 'en'
         ? 'Failed to load payment component. Please refresh and try again.'
@@ -272,7 +278,7 @@ export default function PaymentQRCode({
     popupUrl.pathname = '/pay/stripe-popup';
     popupUrl.search = '';
     popupUrl.searchParams.set('order_id', orderId);
-    popupUrl.searchParams.set('amount', String(amount));
+    popupUrl.searchParams.set('amount', String(displayAmount));
     popupUrl.searchParams.set('theme', dark ? 'dark' : 'light');
     popupUrl.searchParams.set('method', stripePaymentMethod);
     if (statusAccessToken) {
@@ -416,10 +422,9 @@ export default function PaymentQRCode({
           {'¥'}
           {displayAmount.toFixed(2)}
         </div>
-        {hasFeeDiff && (
+        {(showCreditedBalance || hasFeeDiff) && (
           <div className={['mt-1 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-            {t.credited}
-            {amount.toFixed(2)}
+            {showCreditedBalance ? `${t.creditedBalance}${Number(creditAmount).toFixed(0)}` : `${t.credited}${amount.toFixed(2)}`}
           </div>
         )}
         <div
@@ -500,7 +505,7 @@ export default function PaymentQRCode({
                           {t.processing}
                         </span>
                       ) : (
-                        `${t.payNow} ¥${amount.toFixed(2)}`
+                        `${t.payNow} ¥${displayAmount.toFixed(2)}`
                       )}
                     </button>
                   )}
