@@ -61,6 +61,9 @@ export async function GET(request: NextRequest) {
           groupAllowMessagesDispatch: group?.allow_messages_dispatch ?? false,
           groupDefaultMappedModel: group?.default_mapped_model ?? null,
           productName: plan.productName ?? null,
+          inviteRewardEnabled: plan.inviteRewardEnabled,
+          inviterRewardAmount: plan.inviterRewardAmount ? Number(plan.inviterRewardAmount) : null,
+          inviteeRewardAmount: plan.inviteeRewardAmount ? Number(plan.inviteeRewardAmount) : null,
           createdAt: plan.createdAt,
           updatedAt: plan.updatedAt,
         };
@@ -91,6 +94,9 @@ export async function POST(request: NextRequest) {
       for_sale,
       sort_order,
       product_name,
+      invite_reward_enabled,
+      inviter_reward_amount,
+      invitee_reward_amount,
     } = body;
 
     if (!group_id || price === undefined) {
@@ -119,6 +125,20 @@ export async function POST(request: NextRequest) {
     if (sort_order !== undefined && (!Number.isInteger(sort_order) || sort_order < 0)) {
       return NextResponse.json({ error: 'sort_order 必须是非负整数' }, { status: 400 });
     }
+    if (
+      inviter_reward_amount !== undefined &&
+      inviter_reward_amount !== null &&
+      (typeof inviter_reward_amount !== 'number' || inviter_reward_amount < 0 || inviter_reward_amount > 99999999.99)
+    ) {
+      return NextResponse.json({ error: 'inviter_reward_amount 必须是 0 ~ 99999999.99 之间的数值' }, { status: 400 });
+    }
+    if (
+      invitee_reward_amount !== undefined &&
+      invitee_reward_amount !== null &&
+      (typeof invitee_reward_amount !== 'number' || invitee_reward_amount < 0 || invitee_reward_amount > 99999999.99)
+    ) {
+      return NextResponse.json({ error: 'invitee_reward_amount 必须是 0 ~ 99999999.99 之间的数值' }, { status: 400 });
+    }
 
     const plan = await prisma.subscriptionPlan.create({
       data: {
@@ -131,6 +151,9 @@ export async function POST(request: NextRequest) {
         validityUnit: ['day', 'week', 'month'].includes(validity_unit) ? validity_unit : 'day',
         features: features ? JSON.stringify(features) : null,
         productName: product_name?.trim() || null,
+        inviteRewardEnabled: invite_reward_enabled ?? false,
+        inviterRewardAmount: inviter_reward_amount ?? null,
+        inviteeRewardAmount: invitee_reward_amount ?? null,
         forSale: for_sale ?? false,
         sortOrder: sort_order ?? 0,
       },
@@ -151,6 +174,9 @@ export async function POST(request: NextRequest) {
         sortOrder: plan.sortOrder,
         enabled: plan.forSale,
         productName: plan.productName ?? null,
+        inviteRewardEnabled: plan.inviteRewardEnabled,
+        inviterRewardAmount: plan.inviterRewardAmount ? Number(plan.inviterRewardAmount) : null,
+        inviteeRewardAmount: plan.inviteeRewardAmount ? Number(plan.inviteeRewardAmount) : null,
         createdAt: plan.createdAt,
         updatedAt: plan.updatedAt,
       },

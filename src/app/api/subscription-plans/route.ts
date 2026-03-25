@@ -66,6 +66,9 @@ export async function GET(request: NextRequest) {
           allowMessagesDispatch: group?.allow_messages_dispatch ?? false,
           defaultMappedModel: group?.default_mapped_model ?? null,
           modelScopes: group?.supported_model_scopes ?? null,
+          inviteRewardEnabled: plan.inviteRewardEnabled,
+          inviterRewardAmount: plan.inviterRewardAmount ? Number(plan.inviterRewardAmount) : null,
+          inviteeRewardAmount: plan.inviteeRewardAmount ? Number(plan.inviteeRewardAmount) : null,
         };
       }),
     );

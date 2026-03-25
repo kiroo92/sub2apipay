@@ -51,6 +51,9 @@ export async function PUT(request: NextRequest) {
       'PRODUCT_NAME_PREFIX',
       'PRODUCT_NAME_SUFFIX',
       'BALANCE_PAYMENT_DISABLED',
+      'INVITE_PROGRAM_ENABLED',
+      'INVITE_BINDING_ENABLED',
+      'INVITE_REWARD_ENABLED',
     ]);
 
     // 校验每条配置

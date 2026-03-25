@@ -21,6 +21,7 @@ import { pickLocaleText, type Locale } from '@/lib/locale';
 import { getBizDayStartUTC } from '@/lib/time/biz-day';
 import { buildOrderResultUrl, createOrderStatusAccessToken } from '@/lib/order/status-access';
 import { getSystemConfig, getSystemConfigs } from '@/lib/system-config';
+import { processInviteRewardsForOrder } from '@/lib/invite/service';
 
 const MAX_PENDING_ORDERS = 3;
 /** Decimal(10,2) 允许的最大金额 */
@@ -581,12 +582,25 @@ export async function confirmPayment(input: {
     // 重新查询当前状态，区分「已成功」和「需重试」
     const current = await prisma.order.findUnique({
       where: { id: order.id },
-      select: { status: true },
+      select: { status: true, orderType: true },
     });
     if (!current) return true;
 
-    // 已完成或已退款 — 告知支付平台成功
-    if (current.status === ORDER_STATUS.COMPLETED || current.status === ORDER_STATUS.REFUNDED) {
+    // 已完成订单：补偿性尝试邀请奖励，保证重复通知时仍可完成奖励发放
+    if (current.status === ORDER_STATUS.COMPLETED) {
+      if (current.orderType === 'subscription') {
+        try {
+          await processInviteRewardsForOrder(order.id);
+        } catch (err) {
+          console.error('Invite reward retry failed for order:', order.id, err);
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // 已退款 — 告知支付平台成功
+    if (current.status === ORDER_STATUS.REFUNDED) {
       return true;
     }
 
@@ -778,6 +792,13 @@ export async function executeSubscriptionFulfillment(orderId: string): Promise<v
       },
     });
 
+    throw error;
+  }
+
+  try {
+    await processInviteRewardsForOrder(orderId);
+  } catch (error) {
+    console.error('Invite reward processing failed for completed subscription order:', orderId, error);
     throw error;
   }
 }

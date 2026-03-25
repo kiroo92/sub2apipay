@@ -57,6 +57,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.sort_order !== undefined && (!Number.isInteger(body.sort_order) || body.sort_order < 0)) {
       return NextResponse.json({ error: 'sort_order 必须是非负整数' }, { status: 400 });
     }
+    if (
+      body.inviter_reward_amount !== undefined &&
+      body.inviter_reward_amount !== null &&
+      (typeof body.inviter_reward_amount !== 'number' ||
+        body.inviter_reward_amount < 0 ||
+        body.inviter_reward_amount > 99999999.99)
+    ) {
+      return NextResponse.json({ error: 'inviter_reward_amount 必须是 0 ~ 99999999.99 之间的数值' }, { status: 400 });
+    }
+    if (
+      body.invitee_reward_amount !== undefined &&
+      body.invitee_reward_amount !== null &&
+      (typeof body.invitee_reward_amount !== 'number' ||
+        body.invitee_reward_amount < 0 ||
+        body.invitee_reward_amount > 99999999.99)
+    ) {
+      return NextResponse.json({ error: 'invitee_reward_amount 必须是 0 ~ 99999999.99 之间的数值' }, { status: 400 });
+    }
 
     const data: Record<string, unknown> = {};
     if (body.group_id !== undefined) data.groupId = Number(body.group_id);
@@ -70,6 +88,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     if (body.features !== undefined) data.features = body.features ? JSON.stringify(body.features) : null;
     if (body.product_name !== undefined) data.productName = body.product_name?.trim() || null;
+    if (body.invite_reward_enabled !== undefined) data.inviteRewardEnabled = body.invite_reward_enabled;
+    if (body.inviter_reward_amount !== undefined) data.inviterRewardAmount = body.inviter_reward_amount;
+    if (body.invitee_reward_amount !== undefined) data.inviteeRewardAmount = body.invitee_reward_amount;
     if (body.for_sale !== undefined) data.forSale = body.for_sale;
     if (body.sort_order !== undefined) data.sortOrder = body.sort_order;
 
@@ -92,6 +113,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       sortOrder: plan.sortOrder,
       enabled: plan.forSale,
       productName: plan.productName ?? null,
+      inviteRewardEnabled: plan.inviteRewardEnabled,
+      inviterRewardAmount: plan.inviterRewardAmount ? Number(plan.inviterRewardAmount) : null,
+      inviteeRewardAmount: plan.inviteeRewardAmount ? Number(plan.inviteeRewardAmount) : null,
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt,
     });

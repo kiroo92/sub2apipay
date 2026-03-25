@@ -7,48 +7,49 @@ datasource db {
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  userId        Int         @map("user_id")
-  userEmail     String?     @map("user_email")
-  userName      String?     @map("user_name")
-  userNotes     String?     @map("user_notes")
-  amount        Decimal     @db.Decimal(10, 2)
-  payAmount     Decimal?    @db.Decimal(10, 2) @map("pay_amount")
-  creditAmount  Decimal?    @db.Decimal(10, 2) @map("credit_amount")
-  feeRate       Decimal?    @db.Decimal(5, 4)  @map("fee_rate")
-  rechargeCode  String      @unique @map("recharge_code")
-  status        OrderStatus @default(PENDING)
-  paymentType   String      @map("payment_type")
+  id           String      @id @default(cuid())
+  userId       Int         @map("user_id")
+  userEmail    String?     @map("user_email")
+  userName     String?     @map("user_name")
+  userNotes    String?     @map("user_notes")
+  amount       Decimal     @db.Decimal(10, 2)
+  payAmount    Decimal?    @map("pay_amount") @db.Decimal(10, 2)
+  creditAmount Decimal?    @map("credit_amount") @db.Decimal(10, 2)
+  feeRate      Decimal?    @map("fee_rate") @db.Decimal(5, 4)
+  rechargeCode String      @unique @map("recharge_code")
+  status       OrderStatus @default(PENDING)
+  paymentType  String      @map("payment_type")
 
-  paymentTradeNo String?    @map("payment_trade_no")
-  payUrl        String?     @map("pay_url")
-  qrCode        String?     @map("qr_code")
-  qrCodeImg     String?     @map("qr_code_img")
+  paymentTradeNo String? @map("payment_trade_no")
+  payUrl         String? @map("pay_url")
+  qrCode         String? @map("qr_code")
+  qrCodeImg      String? @map("qr_code_img")
 
-  refundAmount  Decimal?    @db.Decimal(10, 2) @map("refund_amount")
-  refundReason  String?     @map("refund_reason")
-  refundAt      DateTime?   @map("refund_at")
-  forceRefund   Boolean     @default(false) @map("force_refund")
+  refundAmount Decimal?  @map("refund_amount") @db.Decimal(10, 2)
+  refundReason String?   @map("refund_reason")
+  refundAt     DateTime? @map("refund_at")
+  forceRefund  Boolean   @default(false) @map("force_refund")
 
-  expiresAt     DateTime    @map("expires_at")
-  paidAt        DateTime?   @map("paid_at")
-  completedAt   DateTime?   @map("completed_at")
-  failedAt      DateTime?   @map("failed_at")
-  failedReason  String?     @map("failed_reason")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  clientIp      String?     @map("client_ip")
-  srcHost       String?     @map("src_host")
-  srcUrl        String?     @map("src_url")
+  expiresAt    DateTime  @map("expires_at")
+  paidAt       DateTime? @map("paid_at")
+  completedAt  DateTime? @map("completed_at")
+  failedAt     DateTime? @map("failed_at")
+  failedReason String?   @map("failed_reason")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  clientIp     String?   @map("client_ip")
+  srcHost      String?   @map("src_host")
+  srcUrl       String?   @map("src_url")
 
   // ── 订单类型 & 订阅相关 ──
-  orderType           String             @default("balance") @map("order_type")
-  planId              String?            @map("plan_id")
-  plan                SubscriptionPlan?  @relation(fields: [planId], references: [id])
-  subscriptionGroupId Int?               @map("subscription_group_id")
-  subscriptionDays    Int?               @map("subscription_days")
+  orderType           String            @default("balance") @map("order_type")
+  planId              String?           @map("plan_id")
+  plan                SubscriptionPlan? @relation(fields: [planId], references: [id])
+  subscriptionGroupId Int?              @map("subscription_group_id")
+  subscriptionDays    Int?              @map("subscription_days")
 
-  auditLogs     AuditLog[]
+  auditLogs          AuditLog[]
+  inviteRewardGrants InviteRewardGrant[]
 
   @@index([userId])
   @@index([status])
@@ -93,7 +94,7 @@ model Channel {
   groupId        Int      @unique @map("group_id")
   name           String
   platform       String   @default("claude")
-  rateMultiplier Decimal  @db.Decimal(10, 4) @map("rate_multiplier")
+  rateMultiplier Decimal  @map("rate_multiplier") @db.Decimal(10, 4)
   description    String?  @db.Text
   models         String?  @db.Text
   features       String?  @db.Text
@@ -108,25 +109,92 @@ model Channel {
 
 // ── 订阅套餐配置 ──
 model SubscriptionPlan {
-  id            String   @id @default(cuid())
-  groupId       Int?     @map("group_id")
-  name          String
-  description   String?  @db.Text
-  price         Decimal  @db.Decimal(10, 2)
-  originalPrice Decimal? @db.Decimal(10, 2) @map("original_price")
-  validityDays  Int      @default(30) @map("validity_days")
-  validityUnit  String   @default("day") @map("validity_unit") // day | week | month
-  features      String?  @db.Text
-  productName   String?  @map("product_name")
-  forSale       Boolean  @default(false) @map("for_sale")
-  sortOrder     Int      @default(0) @map("sort_order")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(cuid())
+  groupId             Int?     @map("group_id")
+  name                String
+  description         String?  @db.Text
+  price               Decimal  @db.Decimal(10, 2)
+  originalPrice       Decimal? @map("original_price") @db.Decimal(10, 2)
+  validityDays        Int      @default(30) @map("validity_days")
+  validityUnit        String   @default("day") @map("validity_unit") // day | week | month
+  features            String?  @db.Text
+  productName         String?  @map("product_name")
+  inviteRewardEnabled Boolean  @default(false) @map("invite_reward_enabled")
+  inviterRewardAmount Decimal? @map("inviter_reward_amount") @db.Decimal(10, 2)
+  inviteeRewardAmount Decimal? @map("invitee_reward_amount") @db.Decimal(10, 2)
+  forSale             Boolean  @default(false) @map("for_sale")
+  sortOrder           Int      @default(0) @map("sort_order")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
-  orders        Order[]
+  orders Order[]
 
   @@index([forSale, sortOrder])
   @@map("subscription_plans")
+}
+
+enum InviteRewardRole {
+  INVITER
+  INVITEE
+}
+
+enum InviteRewardStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model InviteCode {
+  id        String   @id @default(cuid())
+  userId    Int      @unique @map("user_id")
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bindings InviteBinding[]
+
+  @@map("invite_codes")
+}
+
+model InviteBinding {
+  id            String     @id @default(cuid())
+  inviterUserId Int        @map("inviter_user_id")
+  inviteeUserId Int        @unique @map("invitee_user_id")
+  inviteCodeId  String     @map("invite_code_id")
+  inviteCode    InviteCode @relation(fields: [inviteCodeId], references: [id])
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  rewardGrants InviteRewardGrant[]
+
+  @@index([inviterUserId])
+  @@index([inviteCodeId])
+  @@map("invite_bindings")
+}
+
+model InviteRewardGrant {
+  id              String             @id @default(cuid())
+  orderId         String             @map("order_id")
+  order           Order              @relation(fields: [orderId], references: [id])
+  bindingId       String             @map("binding_id")
+  binding         InviteBinding      @relation(fields: [bindingId], references: [id])
+  recipientUserId Int                @map("recipient_user_id")
+  role            InviteRewardRole
+  amount          Decimal            @db.Decimal(10, 2)
+  status          InviteRewardStatus @default(PENDING)
+  idempotencyKey  String             @unique @map("idempotency_key")
+  failedReason    String?            @map("failed_reason")
+  processingAt    DateTime?          @map("processing_at")
+  completedAt     DateTime?          @map("completed_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@unique([orderId, role])
+  @@index([bindingId])
+  @@index([recipientUserId])
+  @@index([status])
+  @@map("invite_reward_grants")
 }
 
 // ── 系统配置 ──
