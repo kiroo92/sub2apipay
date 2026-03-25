@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const response = NextResponse.next();
 
   // 自动从 SUB2API_BASE_URL 提取 origin，允许 Sub2API 主站 iframe 嵌入
