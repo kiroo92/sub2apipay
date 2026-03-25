@@ -81,6 +81,15 @@ export default function SubscriptionConfirm({
             'Plans only apply to their specified models and endpoints, must be purchased directly, and cannot be redeemed with account balance.',
           )}
         </div>
+        {((plan.inviterRewardAmount ?? 0) > 0 || (plan.inviteeRewardAmount ?? 0) > 0) && (
+          <div className="mt-2 text-xs leading-5 opacity-90">
+            {pickLocaleText(
+              locale,
+              '如命中邀请活动，奖励将以普通 USD 余额发放，不影响本次套餐购买金额。',
+              'If invite rewards apply, they will be credited as regular USD balance and do not change this purchase amount.',
+            )}
+          </div>
+        )}
       </div>
 
       {/* Payment method selector */}

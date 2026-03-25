@@ -13,6 +13,7 @@ import SubscriptionPlanCard from '@/components/SubscriptionPlanCard';
 import SubscriptionConfirm from '@/components/SubscriptionConfirm';
 import UserSubscriptions from '@/components/UserSubscriptions';
 import PurchaseFlow from '@/components/PurchaseFlow';
+import InviteBindingCard from '@/components/InviteBindingCard';
 import { resolveLocale, pickLocaleText, applyLocaleToSearchParams } from '@/lib/locale';
 import { detectDeviceIsMobile, applySublabelOverrides, type UserInfo, type MyOrder } from '@/lib/pay-utils';
 import type { PublicOrderStatusSnapshot } from '@/lib/order/status';
@@ -20,6 +21,7 @@ import type { MethodLimitInfo } from '@/components/PaymentForm';
 import type { ChannelInfo } from '@/components/ChannelGrid';
 import type { PlanInfo } from '@/components/SubscriptionPlanCard';
 import type { UserSub } from '@/components/UserSubscriptions';
+import { fetchInviteSummaryCompat, normalizeInviteSummary, type InviteSummary } from '@/lib/invite-client';
 
 interface OrderResult {
   orderId: string;
@@ -84,6 +86,7 @@ function PayContent() {
   const [userSubscriptions, setUserSubscriptions] = useState<UserSub[]>([]);
   const [showTopUpForm, setShowTopUpForm] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanInfo | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<InviteSummary | null>(null);
   const [channelsLoaded, setChannelsLoaded] = useState(false);
   const [userLoaded, setUserLoaded] = useState(false);
 
@@ -169,6 +172,7 @@ function PayContent() {
       const meRes = await fetch(`/api/orders/my?token=${encodeURIComponent(token)}`);
       if (!meRes.ok) {
         setUserNotFound(true);
+        setInviteInfo(null);
         return;
       }
 
@@ -177,6 +181,7 @@ function PayContent() {
       const meId = Number(meUser.id);
       if (!Number.isInteger(meId) || meId <= 0) {
         setUserNotFound(true);
+        setInviteInfo(null);
         return;
       }
 
@@ -203,6 +208,7 @@ function PayContent() {
       }
 
       const cfgRes = await fetch(`/api/user?user_id=${meId}&token=${encodeURIComponent(token)}`);
+      let nextInviteInfo: InviteSummary | null = null;
       if (cfgRes.ok) {
         const cfgData = await cfgRes.json();
         if (cfgData.config) {
@@ -222,7 +228,18 @@ function PayContent() {
             applySublabelOverrides(cfgData.config.sublabelOverrides);
           }
         }
+        nextInviteInfo = normalizeInviteSummary(cfgData.invite);
       }
+
+      if (!nextInviteInfo) {
+        try {
+          nextInviteInfo = await fetchInviteSummaryCompat(token, meId);
+        } catch {
+          nextInviteInfo = null;
+        }
+      }
+
+      setInviteInfo(nextInviteInfo);
     } catch {
     } finally {
       setUserLoaded(true);
@@ -360,6 +377,7 @@ function PayContent() {
 
   const pcOrdersUrl = buildScopedUrl('/pay/orders');
   const mobileOrdersUrl = buildScopedUrl('/pay', true);
+  const bindPageUrl = buildScopedUrl('/bind');
   const ordersUrl = isMobile ? mobileOrdersUrl : pcOrdersUrl;
 
   // ── 余额充值提交 ──
@@ -580,6 +598,12 @@ function PayContent() {
           ].join(' ')}
         >
           {error}
+        </div>
+      )}
+
+      {step === 'form' && (
+        <div className="mb-4">
+          <InviteBindingCard invite={inviteInfo} isDark={isDark} locale={locale} bindPageHref={bindPageUrl} />
         </div>
       )}
 

@@ -27,6 +27,8 @@ export interface PlanInfo {
   allowMessagesDispatch: boolean;
   defaultMappedModel: string | null;
   modelScopes?: string[] | null;
+  inviterRewardAmount?: number | null;
+  inviteeRewardAmount?: number | null;
 }
 
 /** 套餐信息展示（Header + 价格 + 描述 + 倍率/限额 + 特性），不含操作按钮 */
@@ -49,6 +51,7 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
   const isOpenAI = plan.platform?.toLowerCase() === 'openai';
   const ps = getPlatformStyle(plan.platform ?? '');
   const accentCls = isDark ? ps.accent.dark : ps.accent.light;
+  const hasInviteRewards = (plan.inviterRewardAmount ?? 0) > 0 || (plan.inviteeRewardAmount ?? 0) > 0;
 
   return (
     <>
@@ -175,6 +178,52 @@ export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDa
               </span>
               <div className={['text-lg font-semibold', isDark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
                 ${plan.limits.monthly_limit_usd}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Invite rewards */}
+      {hasInviteRewards && (
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {(plan.inviterRewardAmount ?? 0) > 0 && (
+            <div
+              className={[
+                'rounded-xl border px-3 py-3',
+                isDark ? 'border-cyan-500/20 bg-cyan-500/10' : 'border-cyan-200 bg-cyan-50',
+              ].join(' ')}
+            >
+              <div className={['text-xs', isDark ? 'text-cyan-200/80' : 'text-cyan-700'].join(' ')}>
+                {pickLocaleText(locale, '邀请人奖励', 'Inviter reward')}
+              </div>
+              <div className={['mt-1 text-lg font-semibold', isDark ? 'text-cyan-300' : 'text-cyan-700'].join(' ')}>
+                +${plan.inviterRewardAmount}
+              </div>
+              <div className={['mt-1 text-xs leading-5', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                {pickLocaleText(
+                  locale,
+                  '订阅完成后发放到普通余额',
+                  'Credited to regular balance after subscription fulfillment',
+                )}
+              </div>
+            </div>
+          )}
+          {(plan.inviteeRewardAmount ?? 0) > 0 && (
+            <div
+              className={[
+                'rounded-xl border px-3 py-3',
+                isDark ? 'border-indigo-500/20 bg-indigo-500/10' : 'border-indigo-200 bg-indigo-50',
+              ].join(' ')}
+            >
+              <div className={['text-xs', isDark ? 'text-indigo-200/80' : 'text-indigo-700'].join(' ')}>
+                {pickLocaleText(locale, '被邀请人奖励', 'Invitee reward')}
+              </div>
+              <div className={['mt-1 text-lg font-semibold', isDark ? 'text-indigo-300' : 'text-indigo-700'].join(' ')}>
+                +${plan.inviteeRewardAmount}
+              </div>
+              <div className={['mt-1 text-xs leading-5', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                {pickLocaleText(locale, '仅对符合条件的订阅订单生效', 'Applies to eligible subscription orders only')}
               </div>
             </div>
           )}

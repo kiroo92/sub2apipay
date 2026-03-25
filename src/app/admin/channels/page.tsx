@@ -104,10 +104,15 @@ function getTexts(locale: Locale) {
         yes: 'Yes',
         no: 'No',
         rechargeConfig: 'Recharge Configuration',
+        inviteConfig: 'Invite Configuration',
         productNamePrefix: 'Product Name Prefix',
         productNameSuffix: 'Product Name Suffix',
         preview: 'Preview',
         enableBalanceRecharge: 'Enable Balance Recharge',
+        enableInviteProgram: 'Enable Invite Program',
+        allowInviteBinding: 'Allow Pay-Page Binding',
+        enableInviteReward: 'Enable Invite Rewards',
+        inviteConfigHint: 'Controls only invite UI/behavior. Reward amounts are configured per subscription plan.',
         saveConfig: 'Save',
         savingConfig: 'Saving...',
         configSaved: 'Configuration saved',
@@ -166,10 +171,15 @@ function getTexts(locale: Locale) {
         yes: '是',
         no: '否',
         rechargeConfig: '充值配置',
+        inviteConfig: '邀请配置',
         productNamePrefix: '商品名前缀',
         productNameSuffix: '商品名后缀',
         preview: '预览',
         enableBalanceRecharge: '启用余额充值',
+        enableInviteProgram: '启用邀请体系',
+        allowInviteBinding: '允许支付页绑定',
+        enableInviteReward: '启用邀请奖励',
+        inviteConfigHint: '这里只控制邀请功能开关；每个套餐的奖励额度在订阅管理里配置。',
         saveConfig: '保存',
         savingConfig: '保存中...',
         configSaved: '配置已保存',
@@ -239,6 +249,9 @@ function ChannelsContent() {
   const [rcPrefix, setRcPrefix] = useState('');
   const [rcSuffix, setRcSuffix] = useState('');
   const [rcBalanceEnabled, setRcBalanceEnabled] = useState(true);
+  const [inviteProgramEnabled, setInviteProgramEnabled] = useState(false);
+  const [inviteBindingEnabled, setInviteBindingEnabled] = useState(false);
+  const [inviteRewardEnabled, setInviteRewardEnabled] = useState(false);
   const [rcSaving, setRcSaving] = useState(false);
 
   // Sync modal state
@@ -283,6 +296,9 @@ function ChannelsContent() {
           if (c.key === 'PRODUCT_NAME_PREFIX') setRcPrefix(c.value);
           if (c.key === 'PRODUCT_NAME_SUFFIX') setRcSuffix(c.value);
           if (c.key === 'BALANCE_PAYMENT_DISABLED') setRcBalanceEnabled(c.value !== 'true');
+          if (c.key === 'INVITE_PROGRAM_ENABLED') setInviteProgramEnabled(c.value === 'true');
+          if (c.key === 'INVITE_BINDING_ENABLED') setInviteBindingEnabled(c.value === 'true');
+          if (c.key === 'INVITE_REWARD_ENABLED') setInviteRewardEnabled(c.value === 'true');
         }
       }
     } catch {
@@ -309,6 +325,24 @@ function ChannelsContent() {
               value: rcBalanceEnabled ? 'false' : 'true',
               group: 'payment',
               label: '余额充值禁用',
+            },
+            {
+              key: 'INVITE_PROGRAM_ENABLED',
+              value: inviteProgramEnabled ? 'true' : 'false',
+              group: 'invite',
+              label: '邀请体系总开关',
+            },
+            {
+              key: 'INVITE_BINDING_ENABLED',
+              value: inviteBindingEnabled ? 'true' : 'false',
+              group: 'invite',
+              label: '邀请绑定开关',
+            },
+            {
+              key: 'INVITE_REWARD_ENABLED',
+              value: inviteRewardEnabled ? 'true' : 'false',
+              group: 'invite',
+              label: '邀请奖励开关',
             },
           ],
         }),
@@ -650,27 +684,61 @@ function ChannelsContent() {
             </div>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setRcBalanceEnabled(!rcBalanceEnabled)}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              checked: rcBalanceEnabled,
+              onChange: () => setRcBalanceEnabled(!rcBalanceEnabled),
+              label: t.enableBalanceRecharge,
+            },
+            {
+              checked: inviteProgramEnabled,
+              onChange: () => setInviteProgramEnabled(!inviteProgramEnabled),
+              label: t.enableInviteProgram,
+            },
+            {
+              checked: inviteBindingEnabled,
+              onChange: () => setInviteBindingEnabled(!inviteBindingEnabled),
+              label: t.allowInviteBinding,
+            },
+            {
+              checked: inviteRewardEnabled,
+              onChange: () => setInviteRewardEnabled(!inviteRewardEnabled),
+              label: t.enableInviteReward,
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
               className={[
-                'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                rcBalanceEnabled ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
+                'flex items-center justify-between rounded-lg border px-3 py-2',
+                isDark ? 'border-slate-600 bg-slate-900/40' : 'border-slate-200 bg-slate-50',
               ].join(' ')}
             >
-              <span
+              <span className={['pr-3 text-sm', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
+                {item.label}
+              </span>
+              <button
+                type="button"
+                onClick={item.onChange}
                 className={[
-                  'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
-                  rcBalanceEnabled ? 'translate-x-4.5' : 'translate-x-0.5',
+                  'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                  item.checked ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
                 ].join(' ')}
-              />
-            </button>
-            <span className={['text-sm', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
-              {t.enableBalanceRecharge}
-            </span>
-          </div>
+              >
+                <span
+                  className={[
+                    'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
+                    item.checked ? 'translate-x-4.5' : 'translate-x-0.5',
+                  ].join(' ')}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className={['mt-3 text-xs leading-5', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+          {t.inviteConfigHint}
+        </p>
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
             onClick={saveRechargeConfig}

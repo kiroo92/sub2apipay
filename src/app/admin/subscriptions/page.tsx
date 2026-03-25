@@ -29,6 +29,8 @@ interface SubscriptionPlan {
   groupMonthlyLimit: number | null;
   groupModelScopes: string[] | null;
   productName: string | null;
+  inviterRewardAmount: number | null;
+  inviteeRewardAmount: number | null;
   groupAllowMessagesDispatch: boolean;
   groupDefaultMappedModel: string | null;
 }
@@ -126,6 +128,10 @@ function buildText(locale: Locale) {
         enterUserId: 'Enter a keyword to search users',
         fieldProductName: 'Payment Product Name',
         fieldProductNamePlaceholder: 'Leave empty for default',
+        fieldInviterRewardAmount: 'Inviter Reward (USD balance)',
+        fieldInviteeRewardAmount: 'Invitee Reward (USD balance)',
+        rewardSummary: 'Invite Rewards',
+        rewardHint: 'Set to 0 or leave empty to disable this side reward.',
         saveFailed: 'Failed to save plan',
         deleteFailed: 'Failed to delete plan',
         loadFailed: 'Failed to load data',
@@ -208,6 +214,10 @@ function buildText(locale: Locale) {
         enterUserId: '输入关键词搜索用户',
         fieldProductName: '支付商品名称',
         fieldProductNamePlaceholder: '留空使用默认名称',
+        fieldInviterRewardAmount: '邀请人奖励（USD 余额）',
+        fieldInviteeRewardAmount: '被邀请人奖励（USD 余额）',
+        rewardSummary: '邀请奖励',
+        rewardHint: '留空或填 0 代表该侧不发奖励。',
         saveFailed: '保存套餐失败',
         deleteFailed: '删除套餐失败',
         loadFailed: '加载数据失败',
@@ -345,6 +355,8 @@ function SubscriptionsContent() {
   const [formSortOrder, setFormSortOrder] = useState('0');
   const [formEnabled, setFormEnabled] = useState(true);
   const [formProductName, setFormProductName] = useState('');
+  const [formInviterRewardAmount, setFormInviterRewardAmount] = useState('');
+  const [formInviteeRewardAmount, setFormInviteeRewardAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
   /* --- subs state --- */
@@ -422,6 +434,8 @@ function SubscriptionsContent() {
     setFormSortOrder('0');
     setFormEnabled(true);
     setFormProductName('');
+    setFormInviterRewardAmount('');
+    setFormInviteeRewardAmount('');
     setModalOpen(true);
   };
 
@@ -438,6 +452,8 @@ function SubscriptionsContent() {
     setFormSortOrder(String(plan.sortOrder));
     setFormEnabled(plan.enabled);
     setFormProductName(plan.productName ?? '');
+    setFormInviterRewardAmount(plan.inviterRewardAmount != null ? String(plan.inviterRewardAmount) : '');
+    setFormInviteeRewardAmount(plan.inviteeRewardAmount != null ? String(plan.inviteeRewardAmount) : '');
     setModalOpen(true);
   };
 
@@ -466,6 +482,8 @@ function SubscriptionsContent() {
       sort_order: parseInt(formSortOrder, 10) || 0,
       for_sale: formEnabled,
       product_name: formProductName.trim() || null,
+      inviter_reward_amount: formInviterRewardAmount ? parseFloat(formInviterRewardAmount) : null,
+      invitee_reward_amount: formInviteeRewardAmount ? parseFloat(formInviteeRewardAmount) : null,
     };
     try {
       const url = editingPlan ? `/api/admin/subscription-plans/${editingPlan.id}` : '/api/admin/subscription-plans';
@@ -844,7 +862,7 @@ function SubscriptionsContent() {
                     </div>
 
                     {/* Plan fields grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4 lg:grid-cols-6">
                       <div>
                         <span className={['text-xs', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
                           {t.colGroup}
@@ -899,6 +917,41 @@ function SubscriptionsContent() {
                           {t.fieldSortOrder}
                         </span>
                         <div className={isDark ? 'text-slate-200' : 'text-slate-800'}>{plan.sortOrder}</div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <span className={['text-xs', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+                          {t.rewardSummary}
+                        </span>
+                        <div
+                          className={[
+                            'flex flex-wrap gap-2 pt-0.5 text-xs',
+                            isDark ? 'text-slate-300' : 'text-slate-700',
+                          ].join(' ')}
+                        >
+                          {(plan.inviterRewardAmount ?? 0) > 0 ? (
+                            <span
+                              className={[
+                                'rounded-full px-2 py-0.5',
+                                isDark ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-50 text-cyan-700',
+                              ].join(' ')}
+                            >
+                              {locale === 'en' ? 'Inviter' : '邀请人'} +${plan.inviterRewardAmount}
+                            </span>
+                          ) : null}
+                          {(plan.inviteeRewardAmount ?? 0) > 0 ? (
+                            <span
+                              className={[
+                                'rounded-full px-2 py-0.5',
+                                isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700',
+                              ].join(' ')}
+                            >
+                              {locale === 'en' ? 'Invitee' : '被邀请人'} +${plan.inviteeRewardAmount}
+                            </span>
+                          ) : null}
+                          {(plan.inviterRewardAmount ?? 0) <= 0 && (plan.inviteeRewardAmount ?? 0) <= 0 ? (
+                            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>—</span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1431,6 +1484,34 @@ function SubscriptionsContent() {
                   className={inputCls}
                 />
               </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={labelCls}>{t.fieldInviterRewardAmount}</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formInviterRewardAmount}
+                    onChange={(e) => setFormInviterRewardAmount(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t.fieldInviteeRewardAmount}</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formInviteeRewardAmount}
+                    onChange={(e) => setFormInviteeRewardAmount(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <p className={['text-xs leading-5', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+                {t.rewardHint}
+              </p>
 
               {/* Enabled */}
               <div className="flex items-center gap-2">
