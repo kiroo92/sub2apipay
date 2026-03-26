@@ -80,6 +80,22 @@ function formatDateTime(value: string | null, locale: 'zh' | 'en') {
   });
 }
 
+function escapeCsvCell(value: string | number | null | undefined) {
+  const normalized = value == null ? '' : String(value);
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) {
+  const csv = [headers.map(escapeCsvCell).join(','), ...rows.map((row) => row.map(escapeCsvCell).join(','))].join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function buildStatusBadge(status: InviteRewardItem['status'], isDark: boolean) {
   const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
   switch (status) {
@@ -122,6 +138,8 @@ function UserInviteDetailContent() {
           accountStatus: 'Status',
           balanceLabel: 'Balance',
           back: 'Back to Invites',
+          exportBindings: 'Export Bindings CSV',
+          exportRewards: 'Export Rewards CSV',
           refresh: 'Refresh',
           loading: 'Loading...',
           statAsInviter: 'Bindings as Inviter',
@@ -170,6 +188,8 @@ function UserInviteDetailContent() {
           accountStatus: '状态',
           balanceLabel: '余额',
           back: '返回邀请管理',
+          exportBindings: '导出绑定 CSV',
+          exportRewards: '导出返利 CSV',
           refresh: '刷新',
           loading: '加载中...',
           statAsInviter: '作为邀请人的绑定数',
@@ -257,6 +277,35 @@ function UserInviteDetailContent() {
     isDark ? 'text-cyan-300 hover:text-cyan-200' : 'text-cyan-700 hover:text-cyan-900',
   ].join(' ');
 
+  const exportBindingsCsv = useCallback(() => {
+    if (!data) return;
+    downloadCsv(
+      `invite-user-${userId}-bindings.csv`,
+      ['id', 'invite_code', 'inviter_user_id', 'invitee_user_id', 'bound_at'],
+      data.bindings.map((item) => [item.id, item.inviteCode, item.inviterUserId, item.inviteeUserId, item.createdAt]),
+    );
+  }, [data, userId]);
+
+  const exportRewardsCsv = useCallback(() => {
+    if (!data) return;
+    downloadCsv(
+      `invite-user-${userId}-rewards.csv`,
+      ['id', 'order_id', 'order_type', 'invite_code', 'role', 'recipient_user_id', 'amount', 'status', 'created_at', 'failed_reason'],
+      data.rewards.map((item) => [
+        item.id,
+        item.orderId,
+        item.order.orderType,
+        item.binding.inviteCode,
+        item.role,
+        item.recipientUserId,
+        item.amount,
+        item.status,
+        item.createdAt,
+        item.failedReason,
+      ]),
+    );
+  }, [data, userId]);
+
   if (!token) {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
@@ -281,6 +330,12 @@ function UserInviteDetailContent() {
           <a href={hrefWithCurrentQuery('/admin/invites')} className={btnBase}>
             {text.back}
           </a>
+          <button type="button" onClick={exportBindingsCsv} className={btnBase}>
+            {text.exportBindings}
+          </button>
+          <button type="button" onClick={exportRewardsCsv} className={btnBase}>
+            {text.exportRewards}
+          </button>
           <button type="button" onClick={fetchData} className={btnBase}>
             {text.refresh}
           </button>
