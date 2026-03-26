@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import PayPageLayout from '@/components/PayPageLayout';
 import { resolveLocale } from '@/lib/locale';
@@ -42,15 +42,17 @@ interface InviteRewardItem {
   };
 }
 
-interface InviteAdminData {
+interface UserInviteDetailData {
+  userId: number;
   summary: {
-    bindingCount: number;
-    rewardCount: number;
-    rewardAmount: number;
-    completedRewardCount: number;
-    completedRewardAmount: number;
-    failedRewardCount: number;
-    pendingRewardCount: number;
+    asInviterCount: number;
+    asInviteeCount: number;
+    receivedRewardCount: number;
+    receivedRewardAmount: number;
+    generatedInviteeRewardCount: number;
+    generatedInviteeRewardAmount: number;
+    inviterSelfRewardCount: number;
+    inviterSelfRewardAmount: number;
   };
   bindings: InviteBindingItem[];
   rewards: InviteRewardItem[];
@@ -83,7 +85,8 @@ function buildStatusBadge(status: InviteRewardItem['status'], isDark: boolean) {
   }
 }
 
-function InviteAdminContent() {
+function UserInviteDetailContent() {
+  const params = useParams<{ userId: string }>();
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
   const theme = searchParams.get('theme') === 'dark' ? 'dark' : 'light';
@@ -91,6 +94,7 @@ function InviteAdminContent() {
   const locale = resolveLocale(searchParams.get('lang'));
   const isDark = theme === 'dark';
   const isEmbedded = uiMode === 'embedded';
+  const userId = Number(params.userId || '0');
 
   const text =
     locale === 'en'
@@ -99,32 +103,24 @@ function InviteAdminContent() {
           missingTokenHint: 'Please access the admin page from the Sub2API platform.',
           invalidToken: 'Invalid admin token',
           requestFailed: 'Request failed',
-          loadFailed: 'Failed to load invite data',
-          title: 'Invite Management',
-          subtitle: 'Review invite bindings and reward grants',
-          dashboard: 'Dashboard',
+          loadFailed: 'Failed to load invite detail',
+          title: 'Invite User Detail',
+          subtitle: `Inspect invite activity for user #${userId || '-'}`,
+          back: 'Back to Invites',
           refresh: 'Refresh',
-          search: 'Search',
-          userId: 'User ID',
-          inviteCode: 'Invite Code',
-          orderType: 'Order Type',
-          rewardStatus: 'Reward Status',
-          all: 'All',
-          balance: 'Balance Top-Up',
-          subscription: 'Subscription',
-          statBindings: 'Bindings',
-          statRewards: 'Reward Grants',
-          statCompletedAmount: 'Completed Reward Amount',
-          statFailed: 'Failed Grants',
-          bindingsTitle: 'Invite Bindings',
-          bindingsHint: 'Latest 100 bindings matching the current filters.',
-          rewardsTitle: 'Reward Records',
-          rewardsHint: 'Latest 200 reward grants matching the current filters.',
-          noBindings: 'No bindings found',
-          noRewards: 'No reward records found',
+          loading: 'Loading...',
+          statAsInviter: 'Bindings as Inviter',
+          statAsInvitee: 'Bindings as Invitee',
+          statReceivedRewards: 'Rewards Received',
+          statGeneratedInviteeRewards: 'Invitee Rewards Generated',
+          statInviterSelfRewards: 'Inviter Rewards Received',
+          bindingsTitle: 'Related Bindings',
+          rewardsTitle: 'Related Reward Records',
+          noBindings: 'No related bindings',
+          noRewards: 'No related rewards',
           inviter: 'Inviter',
           invitee: 'Invitee',
-          code: 'Code',
+          code: 'Invite Code',
           boundAt: 'Bound At',
           order: 'Order',
           role: 'Role',
@@ -133,11 +129,11 @@ function InviteAdminContent() {
           status: 'Status',
           createdAt: 'Created At',
           detail: 'Detail',
-          loading: 'Loading...',
+          balance: 'Balance Top-Up',
+          subscription: 'Subscription',
           roleInviter: 'Inviter',
           roleInvitee: 'Invitee',
           rewardStatuses: {
-            '': 'All',
             PENDING: 'Pending',
             PROCESSING: 'Processing',
             COMPLETED: 'Completed',
@@ -149,29 +145,21 @@ function InviteAdminContent() {
           missingTokenHint: '请从 Sub2API 平台正确访问管理页面',
           invalidToken: '管理员凭证无效',
           requestFailed: '请求失败',
-          loadFailed: '加载邀请数据失败',
-          title: '邀请管理',
-          subtitle: '查看邀请码绑定关系与返利发放记录',
-          dashboard: '数据概览',
+          loadFailed: '加载邀请详情失败',
+          title: '单人邀请详情',
+          subtitle: `查看用户 #${userId || '-'} 的邀请活动`,
+          back: '返回邀请管理',
           refresh: '刷新',
-          search: '搜索',
-          userId: '用户 ID',
-          inviteCode: '邀请码',
-          orderType: '订单类型',
-          rewardStatus: '返利状态',
-          all: '全部',
-          balance: '余额充值',
-          subscription: '订阅',
-          statBindings: '绑定数',
-          statRewards: '返利记录数',
-          statCompletedAmount: '已完成返利金额',
-          statFailed: '失败返利数',
-          bindingsTitle: '邀请码绑定',
-          bindingsHint: '展示当前筛选条件下最新 100 条绑定记录。',
-          rewardsTitle: '返利记录',
-          rewardsHint: '展示当前筛选条件下最新 200 条返利记录。',
-          noBindings: '暂无绑定记录',
-          noRewards: '暂无返利记录',
+          loading: '加载中...',
+          statAsInviter: '作为邀请人的绑定数',
+          statAsInvitee: '作为被邀请人的绑定数',
+          statReceivedRewards: '收到返利',
+          statGeneratedInviteeRewards: '为被邀请人生成返利',
+          statInviterSelfRewards: '邀请人自收返利',
+          bindingsTitle: '相关绑定记录',
+          rewardsTitle: '相关返利记录',
+          noBindings: '暂无相关绑定记录',
+          noRewards: '暂无相关返利记录',
           inviter: '邀请人',
           invitee: '被邀请人',
           code: '邀请码',
@@ -183,11 +171,11 @@ function InviteAdminContent() {
           status: '状态',
           createdAt: '创建时间',
           detail: '说明',
-          loading: '加载中...',
+          balance: '余额充值',
+          subscription: '订阅',
           roleInviter: '邀请人',
           roleInvitee: '被邀请人',
           rewardStatuses: {
-            '': '全部',
             PENDING: '待处理',
             PROCESSING: '处理中',
             COMPLETED: '已完成',
@@ -195,28 +183,25 @@ function InviteAdminContent() {
           },
         };
 
-  const [filters, setFilters] = useState({
-    userId: '',
-    inviteCode: '',
-    orderType: '',
-    rewardStatus: '',
-  });
-  const [data, setData] = useState<InviteAdminData | null>(null);
+  const [data, setData] = useState<UserInviteDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const hrefWithCurrentQuery = useCallback(
+    (path: string) => {
+      const query = searchParams.toString();
+      return query ? `${path}?${query}` : path;
+    },
+    [searchParams],
+  );
+
   const fetchData = useCallback(async () => {
-    if (!token) return;
+    if (!token || !Number.isInteger(userId) || userId <= 0) return;
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ token });
-      if (filters.userId.trim()) params.set('user_id', filters.userId.trim());
-      if (filters.inviteCode.trim()) params.set('invite_code', filters.inviteCode.trim());
-      if (filters.orderType) params.set('order_type', filters.orderType);
-      if (filters.rewardStatus) params.set('reward_status', filters.rewardStatus);
-
-      const res = await fetch(`/api/admin/invites?${params.toString()}`);
+      const query = searchParams.toString();
+      const res = await fetch(`/api/admin/invites/user/${userId}${query ? `?${query}` : ''}`);
       if (!res.ok) {
         if (res.status === 401) {
           setError(text.invalidToken);
@@ -224,27 +209,17 @@ function InviteAdminContent() {
         }
         throw new Error(text.requestFailed);
       }
-
       setData(await res.json());
     } catch {
       setError(text.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [filters.inviteCode, filters.orderType, filters.rewardStatus, filters.userId, text.invalidToken, text.loadFailed, text.requestFailed, token]);
+  }, [searchParams, text.invalidToken, text.loadFailed, text.requestFailed, token, userId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const navParams = useMemo(() => {
-    const params = new URLSearchParams();
-    if (token) params.set('token', token);
-    if (locale === 'en') params.set('lang', 'en');
-    if (isDark) params.set('theme', 'dark');
-    if (isEmbedded) params.set('ui_mode', 'embedded');
-    return params.toString();
-  }, [token, locale, isDark, isEmbedded]);
 
   const btnBase = [
     'inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
@@ -259,16 +234,6 @@ function InviteAdminContent() {
   const userLinkCls = [
     'font-medium underline underline-offset-2 transition-colors',
     isDark ? 'text-cyan-300 hover:text-cyan-200' : 'text-cyan-700 hover:text-cyan-900',
-  ].join(' ');
-
-  const buildUserHref = (userId: number) => {
-    const query = searchParams.toString();
-    return query ? `/admin/invites/user/${userId}?${query}` : `/admin/invites/user/${userId}`;
-  };
-
-  const inputCls = [
-    'w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/40',
-    isDark ? 'border-slate-600 bg-slate-900/50 text-slate-100 placeholder-slate-500' : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400',
   ].join(' ');
 
   if (!token) {
@@ -292,8 +257,8 @@ function InviteAdminContent() {
       locale={locale}
       actions={
         <>
-          <a href={`/admin/dashboard?${navParams}`} className={btnBase}>
-            {text.dashboard}
+          <a href={hrefWithCurrentQuery('/admin/invites')} className={btnBase}>
+            {text.back}
           </a>
           <button type="button" onClick={fetchData} className={btnBase}>
             {text.refresh}
@@ -302,87 +267,33 @@ function InviteAdminContent() {
       }
     >
       {error && (
-        <div
-          className={`mb-4 rounded-lg border p-3 text-sm ${isDark ? 'border-red-800 bg-red-950/50 text-red-400' : 'border-red-200 bg-red-50 text-red-600'}`}
-        >
+        <div className={`mb-4 rounded-lg border p-3 text-sm ${isDark ? 'border-red-800 bg-red-950/50 text-red-400' : 'border-red-200 bg-red-50 text-red-600'}`}>
           {error}
-          <button onClick={() => setError('')} className="ml-2 opacity-60 hover:opacity-100">
-            ✕
-          </button>
+          <button onClick={() => setError('')} className="ml-2 opacity-60 hover:opacity-100">✕</button>
         </div>
       )}
-
-      <div className={`${cardCls} mb-4`}>
-        <div className="grid gap-3 md:grid-cols-4">
-          <input
-            className={inputCls}
-            placeholder={text.userId}
-            value={filters.userId}
-            onChange={(event) => setFilters((prev) => ({ ...prev, userId: event.target.value }))}
-          />
-          <input
-            className={inputCls}
-            placeholder={text.inviteCode}
-            value={filters.inviteCode}
-            onChange={(event) => setFilters((prev) => ({ ...prev, inviteCode: event.target.value.toUpperCase() }))}
-          />
-          <select
-            className={inputCls}
-            value={filters.orderType}
-            onChange={(event) => setFilters((prev) => ({ ...prev, orderType: event.target.value }))}
-          >
-            <option value="">{text.orderType}: {text.all}</option>
-            <option value="balance">{text.balance}</option>
-            <option value="subscription">{text.subscription}</option>
-          </select>
-          <select
-            className={inputCls}
-            value={filters.rewardStatus}
-            onChange={(event) => setFilters((prev) => ({ ...prev, rewardStatus: event.target.value }))}
-          >
-            {Object.entries(text.rewardStatuses).map(([value, label]) => (
-              <option key={value} value={value}>
-                {text.rewardStatus}: {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-3 flex justify-end">
-          <button type="button" onClick={fetchData} className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700">
-            {text.search}
-          </button>
-        </div>
-      </div>
 
       {loading ? (
         <div className={`py-24 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{text.loading}</div>
       ) : data ? (
         <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
-              { label: text.statBindings, value: data.summary.bindingCount },
-              { label: text.statRewards, value: data.summary.rewardCount },
-              { label: text.statCompletedAmount, value: `$${data.summary.completedRewardAmount.toFixed(2)}` },
-              { label: text.statFailed, value: data.summary.failedRewardCount },
+              { label: text.statAsInviter, value: data.summary.asInviterCount },
+              { label: text.statAsInvitee, value: data.summary.asInviteeCount },
+              { label: text.statReceivedRewards, value: `$${data.summary.receivedRewardAmount.toFixed(2)} / ${data.summary.receivedRewardCount}` },
+              { label: text.statGeneratedInviteeRewards, value: `$${data.summary.generatedInviteeRewardAmount.toFixed(2)} / ${data.summary.generatedInviteeRewardCount}` },
+              { label: text.statInviterSelfRewards, value: `$${data.summary.inviterSelfRewardAmount.toFixed(2)} / ${data.summary.inviterSelfRewardCount}` },
             ].map((item) => (
               <div key={item.label} className={cardCls}>
                 <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{item.label}</div>
-                <div className={['mt-2 text-2xl font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
-                  {item.value}
-                </div>
+                <div className={['mt-2 text-2xl font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{item.value}</div>
               </div>
             ))}
           </div>
 
           <div className={cardCls}>
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h3 className={['text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{text.bindingsTitle}</h3>
-                <p className={['mt-1 text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.bindingsHint}</p>
-              </div>
-              <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{data.summary.bindingCount}</div>
-            </div>
-
+            <h3 className={['mb-4 text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{text.bindingsTitle}</h3>
             {data.bindings.length === 0 ? (
               <div className={['rounded-lg border border-dashed px-4 py-8 text-center text-sm', isDark ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'].join(' ')}>{text.noBindings}</div>
             ) : (
@@ -401,10 +312,10 @@ function InviteAdminContent() {
                       <tr key={item.id} className={['border-t', isDark ? 'border-slate-700' : 'border-slate-200'].join(' ')}>
                         <td className="px-3 py-2 font-mono">{item.inviteCode}</td>
                         <td className="px-3 py-2">
-                          <a href={buildUserHref(item.inviterUserId)} className={userLinkCls}>#{item.inviterUserId}</a>
+                          <a href={hrefWithCurrentQuery(`/admin/invites/user/${item.inviterUserId}`)} className={userLinkCls}>#{item.inviterUserId}</a>
                         </td>
                         <td className="px-3 py-2">
-                          <a href={buildUserHref(item.inviteeUserId)} className={userLinkCls}>#{item.inviteeUserId}</a>
+                          <a href={hrefWithCurrentQuery(`/admin/invites/user/${item.inviteeUserId}`)} className={userLinkCls}>#{item.inviteeUserId}</a>
                         </td>
                         <td className="px-3 py-2">{formatDateTime(item.createdAt, locale)}</td>
                       </tr>
@@ -416,16 +327,7 @@ function InviteAdminContent() {
           </div>
 
           <div className={cardCls}>
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h3 className={['text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{text.rewardsTitle}</h3>
-                <p className={['mt-1 text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.rewardsHint}</p>
-              </div>
-              <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-                ${data.summary.rewardAmount.toFixed(2)} / {data.summary.rewardCount}
-              </div>
-            </div>
-
+            <h3 className={['mb-4 text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{text.rewardsTitle}</h3>
             {data.rewards.length === 0 ? (
               <div className={['rounded-lg border border-dashed px-4 py-8 text-center text-sm', isDark ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-500'].join(' ')}>{text.noRewards}</div>
             ) : (
@@ -455,26 +357,22 @@ function InviteAdminContent() {
                         <td className="px-3 py-2 font-mono">{item.binding.inviteCode}</td>
                         <td className="px-3 py-2">{item.role === 'INVITER' ? text.roleInviter : text.roleInvitee}</td>
                         <td className="px-3 py-2">
-                          <a href={buildUserHref(item.recipientUserId)} className={userLinkCls}>#{item.recipientUserId}</a>
+                          <a href={hrefWithCurrentQuery(`/admin/invites/user/${item.recipientUserId}`)} className={userLinkCls}>#{item.recipientUserId}</a>
                         </td>
                         <td className="px-3 py-2 font-medium">${item.amount.toFixed(2)}</td>
-                        <td className="px-3 py-2">
-                          <span className={buildStatusBadge(item.status, isDark)}>{text.rewardStatuses[item.status]}</span>
-                        </td>
+                        <td className="px-3 py-2"><span className={buildStatusBadge(item.status, isDark)}>{text.rewardStatuses[item.status]}</span></td>
                         <td className="px-3 py-2">{formatDateTime(item.createdAt, locale)}</td>
                         <td className="px-3 py-2 text-xs leading-5">
                           <div>
-                            {locale === 'en' ? 'Inviter' : '邀请人'} <a href={buildUserHref(item.binding.inviterUserId)} className={userLinkCls}>#{item.binding.inviterUserId}</a>
+                            {locale === 'en' ? 'Inviter' : '邀请人'} <a href={hrefWithCurrentQuery(`/admin/invites/user/${item.binding.inviterUserId}`)} className={userLinkCls}>#{item.binding.inviterUserId}</a>
                             {' / '}
-                            {locale === 'en' ? 'Invitee' : '被邀请人'} <a href={buildUserHref(item.binding.inviteeUserId)} className={userLinkCls}>#{item.binding.inviteeUserId}</a>
+                            {locale === 'en' ? 'Invitee' : '被邀请人'} <a href={hrefWithCurrentQuery(`/admin/invites/user/${item.binding.inviteeUserId}`)} className={userLinkCls}>#{item.binding.inviteeUserId}</a>
                           </div>
                           <div className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                            {locale === 'en' ? 'Order user' : '下单用户'} <a href={buildUserHref(item.order.userId)} className={userLinkCls}>#{item.order.userId}</a>
+                            {locale === 'en' ? 'Order user' : '下单用户'} <a href={hrefWithCurrentQuery(`/admin/invites/user/${item.order.userId}`)} className={userLinkCls}>#{item.order.userId}</a>
                           </div>
                           <div className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                            {item.order.orderType === 'balance'
-                              ? `${text.balance} · +$${item.order.creditAmount.toFixed(2)}`
-                              : `${text.subscription} · ¥${item.order.amount.toFixed(2)}`}
+                            {item.order.orderType === 'balance' ? `${text.balance} · +$${item.order.creditAmount.toFixed(2)}` : `${text.subscription} · ¥${item.order.amount.toFixed(2)}`}
                           </div>
                           {item.failedReason ? <div className="text-red-400">{item.failedReason}</div> : null}
                         </td>
@@ -491,7 +389,7 @@ function InviteAdminContent() {
   );
 }
 
-function InviteAdminPageFallback() {
+function UserInviteDetailPageFallback() {
   const searchParams = useSearchParams();
   const locale = resolveLocale(searchParams.get('lang'));
   const isDark = searchParams.get('theme') === 'dark';
@@ -503,10 +401,10 @@ function InviteAdminPageFallback() {
   );
 }
 
-export default function InviteAdminPage() {
+export default function UserInviteDetailPage() {
   return (
-    <Suspense fallback={<InviteAdminPageFallback />}>
-      <InviteAdminContent />
+    <Suspense fallback={<UserInviteDetailPageFallback />}>
+      <UserInviteDetailContent />
     </Suspense>
   );
 }
