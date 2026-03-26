@@ -539,7 +539,24 @@ function PayContent() {
   );
 
   const renderOrdersSection = (className = 'mt-8') => (
-    <div className={className}>
+    <section className={className}>
+      <div
+        className={[
+          'mb-4 rounded-2xl border p-4',
+          isDark ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-slate-50/90',
+        ].join(' ')}
+      >
+        <div className={['text-sm font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
+          {pickLocaleText(locale, '订单记录', 'Order History')}
+        </div>
+        <p className={['mt-1 text-xs leading-5', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+          {pickLocaleText(
+            locale,
+            '这里展示当前账号的支付订单与状态，方便你继续支付、核对结果或回看历史记录。',
+            'Review payment status and history here for the current account.',
+          )}
+        </p>
+      </div>
       <MobileOrderList
         isDark={isDark}
         hasToken={hasToken}
@@ -550,7 +567,7 @@ function PayContent() {
         onLoadMore={loadMoreOrders}
         locale={locale}
       />
-    </div>
+    </section>
   );
 
   // ── 余额充值提交 ──
