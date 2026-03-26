@@ -112,7 +112,9 @@ function getTexts(locale: Locale) {
         enableInviteProgram: 'Enable Invite Program',
         allowInviteBinding: 'Allow Pay-Page Binding',
         enableInviteReward: 'Enable Invite Rewards',
-        inviteConfigHint: 'Controls only invite UI/behavior. Reward amounts are configured per subscription plan.',
+        balanceInviterRewardAmount: 'Balance Top-Up Inviter Reward (USD)',
+        balanceInviteeRewardAmount: 'Balance Top-Up Invitee Reward (USD)',
+        inviteConfigHint: 'Invite toggles live here. Balance-top-up reward amounts are configured below; subscription reward amounts remain on each subscription plan.',
         saveConfig: 'Save',
         savingConfig: 'Saving...',
         configSaved: 'Configuration saved',
@@ -179,7 +181,9 @@ function getTexts(locale: Locale) {
         enableInviteProgram: '启用邀请体系',
         allowInviteBinding: '允许支付页绑定',
         enableInviteReward: '启用邀请奖励',
-        inviteConfigHint: '这里只控制邀请功能开关；每个套餐的奖励额度在订阅管理里配置。',
+        balanceInviterRewardAmount: '余额充值邀请人奖励（USD）',
+        balanceInviteeRewardAmount: '余额充值被邀请人奖励（USD）',
+        inviteConfigHint: '这里控制邀请功能开关；余额充值返利额度在下方配置，订阅奖励额度仍在订阅管理里配置。',
         saveConfig: '保存',
         savingConfig: '保存中...',
         configSaved: '配置已保存',
@@ -252,6 +256,8 @@ function ChannelsContent() {
   const [inviteProgramEnabled, setInviteProgramEnabled] = useState(false);
   const [inviteBindingEnabled, setInviteBindingEnabled] = useState(false);
   const [inviteRewardEnabled, setInviteRewardEnabled] = useState(false);
+  const [balanceInviterRewardAmount, setBalanceInviterRewardAmount] = useState('');
+  const [balanceInviteeRewardAmount, setBalanceInviteeRewardAmount] = useState('');
   const [rcSaving, setRcSaving] = useState(false);
 
   // Sync modal state
@@ -299,6 +305,8 @@ function ChannelsContent() {
           if (c.key === 'INVITE_PROGRAM_ENABLED') setInviteProgramEnabled(c.value === 'true');
           if (c.key === 'INVITE_BINDING_ENABLED') setInviteBindingEnabled(c.value === 'true');
           if (c.key === 'INVITE_REWARD_ENABLED') setInviteRewardEnabled(c.value === 'true');
+          if (c.key === 'INVITE_BALANCE_INVITER_REWARD_AMOUNT') setBalanceInviterRewardAmount(c.value);
+          if (c.key === 'INVITE_BALANCE_INVITEE_REWARD_AMOUNT') setBalanceInviteeRewardAmount(c.value);
         }
       }
     } catch {
@@ -343,6 +351,18 @@ function ChannelsContent() {
               value: inviteRewardEnabled ? 'true' : 'false',
               group: 'invite',
               label: '邀请奖励开关',
+            },
+            {
+              key: 'INVITE_BALANCE_INVITER_REWARD_AMOUNT',
+              value: balanceInviterRewardAmount.trim(),
+              group: 'invite',
+              label: '余额充值邀请人奖励',
+            },
+            {
+              key: 'INVITE_BALANCE_INVITEE_REWARD_AMOUNT',
+              value: balanceInviteeRewardAmount.trim(),
+              group: 'invite',
+              label: '余额充值被邀请人奖励',
             },
           ],
         }),
@@ -734,6 +754,32 @@ function ChannelsContent() {
               </button>
             </div>
           ))}
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>{t.balanceInviterRewardAmount}</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={balanceInviterRewardAmount}
+              onChange={(e) => setBalanceInviterRewardAmount(e.target.value)}
+              className={inputCls}
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <label className={labelCls}>{t.balanceInviteeRewardAmount}</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={balanceInviteeRewardAmount}
+              onChange={(e) => setBalanceInviteeRewardAmount(e.target.value)}
+              className={inputCls}
+              placeholder="0.00"
+            />
+          </div>
         </div>
         <p className={['mt-3 text-xs leading-5', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
           {t.inviteConfigHint}

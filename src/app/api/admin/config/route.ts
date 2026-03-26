@@ -54,6 +54,8 @@ export async function PUT(request: NextRequest) {
       'INVITE_PROGRAM_ENABLED',
       'INVITE_BINDING_ENABLED',
       'INVITE_REWARD_ENABLED',
+      'INVITE_BALANCE_INVITER_REWARD_AMOUNT',
+      'INVITE_BALANCE_INVITEE_REWARD_AMOUNT',
     ]);
 
     // 校验每条配置

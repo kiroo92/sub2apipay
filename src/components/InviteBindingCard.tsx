@@ -149,7 +149,7 @@ export default function InviteBindingCard({
                   isDark ? 'bg-cyan-500/15 text-cyan-300' : 'bg-cyan-50 text-cyan-700',
                 ].join(' ')}
               >
-                {pickLocaleText(locale, '订阅奖励已开启', 'Subscription rewards enabled')}
+                {pickLocaleText(locale, '邀请奖励已开启', 'Invite rewards enabled')}
               </span>
             )}
           </div>
@@ -158,13 +158,13 @@ export default function InviteBindingCard({
             {isBound
               ? pickLocaleText(
                   locale,
-                  '当前账号已完成一次性绑定，后续符合条件的订阅订单将按站点规则结算邀请奖励。',
-                  'This account has already completed its one-time invite binding. Eligible subscription orders will follow the site reward rules.',
+                  '当前账号已完成一次性绑定，后续符合条件的充值或订阅订单将按站点规则结算邀请奖励。',
+                  'This account has already completed its one-time invite binding. Eligible top-up or subscription orders will follow the site reward rules.',
                 )
               : pickLocaleText(
                   locale,
-                  '绑定后，后续符合条件的订阅订单可按站点规则发放邀请奖励；绑定关系为一次性且不可修改。',
-                  'After binding, eligible future subscription orders can grant invite rewards under the site rules. Binding is one-time and cannot be changed.',
+                  '绑定后，后续符合条件的充值或订阅订单可按站点规则发放邀请奖励；绑定关系为一次性且不可修改。',
+                  'After binding, eligible future top-up or subscription orders can grant invite rewards under the site rules. Binding is one-time and cannot be changed.',
                 )}
           </p>
         </div>

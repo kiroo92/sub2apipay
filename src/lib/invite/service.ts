@@ -79,6 +79,13 @@ function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
   return value ? Number(value.toString()) : 0;
 }
 
+function normalizeRewardAmount(value?: string): number {
+  if (!value) return 0;
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount * 100) / 100;
+}
+
 function buildRewardIdempotencyKey(orderId: string, role: InviteRewardRole): string {
   return `sub2apipay:invite-reward:${orderId}:${role.toLowerCase()}`;
 }
@@ -216,10 +223,16 @@ export async function bindInviteCodeForUser(userId: number, rawInviteCode: strin
 }
 
 async function prepareInviteRewardGrants(orderId: string) {
-  const flags = await getInviteFeatureFlags();
+  const [flags, balanceRewardConfigs] = await Promise.all([
+    getInviteFeatureFlags(),
+    getSystemConfigs(['INVITE_BALANCE_INVITER_REWARD_AMOUNT', 'INVITE_BALANCE_INVITEE_REWARD_AMOUNT']),
+  ]);
   if (!flags.programEnabled || !flags.rewardEnabled) {
     return { reason: 'reward_disabled', grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>> };
   }
+
+  const balanceInviterAmount = normalizeRewardAmount(balanceRewardConfigs.INVITE_BALANCE_INVITER_REWARD_AMOUNT);
+  const balanceInviteeAmount = normalizeRewardAmount(balanceRewardConfigs.INVITE_BALANCE_INVITEE_REWARD_AMOUNT);
 
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
@@ -235,7 +248,7 @@ async function prepareInviteRewardGrants(orderId: string) {
       },
     });
 
-    if (!order || order.orderType !== 'subscription' || order.status !== 'COMPLETED' || !order.planId) {
+    if (!order || order.status !== 'COMPLETED' || (order.orderType !== 'subscription' && order.orderType !== 'balance')) {
       return {
         reason: 'order_not_eligible',
         grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>>,
@@ -253,24 +266,47 @@ async function prepareInviteRewardGrants(orderId: string) {
       };
     }
 
-    const plan = await tx.subscriptionPlan.findUnique({
-      where: { id: order.planId },
-      select: {
-        inviteRewardEnabled: true,
-        inviterRewardAmount: true,
-        inviteeRewardAmount: true,
-      },
-    });
+    let inviterAmount = 0;
+    let inviteeAmount = 0;
 
-    if (!plan || !plan.inviteRewardEnabled) {
-      return {
-        reason: 'plan_reward_disabled',
-        grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>>,
-      };
+    if (order.orderType === 'subscription') {
+      if (!order.planId) {
+        return {
+          reason: 'order_not_eligible',
+          grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>>,
+        };
+      }
+
+      const plan = await tx.subscriptionPlan.findUnique({
+        where: { id: order.planId },
+        select: {
+          inviteRewardEnabled: true,
+          inviterRewardAmount: true,
+          inviteeRewardAmount: true,
+        },
+      });
+
+      if (!plan || !plan.inviteRewardEnabled) {
+        return {
+          reason: 'plan_reward_disabled',
+          grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>>,
+        };
+      }
+
+      inviterAmount = decimalToNumber(plan.inviterRewardAmount);
+      inviteeAmount = decimalToNumber(plan.inviteeRewardAmount);
+    } else {
+      inviterAmount = balanceInviterAmount;
+      inviteeAmount = balanceInviteeAmount;
+
+      if (inviterAmount <= 0 && inviteeAmount <= 0) {
+        return {
+          reason: 'balance_reward_disabled',
+          grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>>,
+        };
+      }
     }
 
-    const inviterAmount = decimalToNumber(plan.inviterRewardAmount);
-    const inviteeAmount = decimalToNumber(plan.inviteeRewardAmount);
     const rewardSpecs = [
       {
         role: InviteRewardRole.INVITER,

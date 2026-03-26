@@ -870,6 +870,13 @@ export async function executeRecharge(orderId: string): Promise<void> {
 
     throw error;
   }
+
+  try {
+    await processInviteRewardsForOrder(orderId);
+  } catch (error) {
+    console.error('Invite reward processing failed for completed balance order:', orderId, error);
+    throw error;
+  }
 }
 
 function assertRetryAllowed(order: { status: string; paidAt: Date | null }, locale: Locale): void {
