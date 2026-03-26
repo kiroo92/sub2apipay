@@ -2,6 +2,7 @@ import { InviteRewardStatus, Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
 import { prisma } from '@/lib/db';
+import { getUser } from '@/lib/sub2api/client';
 
 function toNumber(value: Prisma.Decimal | null | undefined): number {
   return value ? Number(value.toString()) : 0;
@@ -29,6 +30,7 @@ export async function GET(
   };
 
   const [
+    user,
     asInviterCount,
     asInviteeCount,
     receivedSummary,
@@ -37,6 +39,7 @@ export async function GET(
     recentBindings,
     recentRewards,
   ] = await Promise.all([
+    getUser(userId).catch(() => null),
     prisma.inviteBinding.count({ where: { inviterUserId: userId } }),
     prisma.inviteBinding.count({ where: { inviteeUserId: userId } }),
     prisma.inviteRewardGrant.aggregate({
@@ -126,6 +129,17 @@ export async function GET(
 
   return NextResponse.json({
     userId,
+    user: user
+      ? {
+          id: user.id,
+          username: user.username ?? null,
+          email: user.email ?? null,
+          notes: user.notes ?? null,
+          displayName: user.username ?? null,
+          status: user.status ?? null,
+          balance: typeof user.balance === 'number' ? user.balance : null,
+        }
+      : null,
     summary: {
       asInviterCount,
       asInviteeCount,

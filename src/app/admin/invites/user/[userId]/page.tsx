@@ -44,6 +44,15 @@ interface InviteRewardItem {
 
 interface UserInviteDetailData {
   userId: number;
+  user: {
+    id: number;
+    username: string | null;
+    email: string | null;
+    notes: string | null;
+    displayName: string | null;
+    status: string | null;
+    balance: number | null;
+  } | null;
   summary: {
     asInviterCount: number;
     asInviteeCount: number;
@@ -106,6 +115,12 @@ function UserInviteDetailContent() {
           loadFailed: 'Failed to load invite detail',
           title: 'Invite User Detail',
           subtitle: `Inspect invite activity for user #${userId || '-'}`,
+          userInfoTitle: 'User Profile',
+          username: 'Username',
+          email: 'Email',
+          notes: 'Notes',
+          accountStatus: 'Status',
+          balanceLabel: 'Balance',
           back: 'Back to Invites',
           refresh: 'Refresh',
           loading: 'Loading...',
@@ -148,6 +163,12 @@ function UserInviteDetailContent() {
           loadFailed: '加载邀请详情失败',
           title: '单人邀请详情',
           subtitle: `查看用户 #${userId || '-'} 的邀请活动`,
+          userInfoTitle: '用户信息',
+          username: '用户名',
+          email: '邮箱',
+          notes: '备注',
+          accountStatus: '状态',
+          balanceLabel: '余额',
           back: '返回邀请管理',
           refresh: '刷新',
           loading: '加载中...',
@@ -277,6 +298,34 @@ function UserInviteDetailContent() {
         <div className={`py-24 text-center ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{text.loading}</div>
       ) : data ? (
         <div className="space-y-6">
+          {data.user && (
+            <div className={cardCls}>
+              <h3 className={['mb-4 text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{text.userInfoTitle}</h3>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div>
+                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.username}</div>
+                  <div className={['mt-1 text-sm font-medium', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>{data.user.displayName || data.user.username || '-'}</div>
+                </div>
+                <div>
+                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.email}</div>
+                  <div className={['mt-1 text-sm break-all', isDark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>{data.user.email || '-'}</div>
+                </div>
+                <div>
+                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.accountStatus}</div>
+                  <div className={['mt-1 text-sm', isDark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>{data.user.status || '-'}</div>
+                </div>
+                <div>
+                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.balanceLabel}</div>
+                  <div className={['mt-1 text-sm', isDark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>{data.user.balance != null ? `$${data.user.balance.toFixed(2)}` : '-'}</div>
+                </div>
+                <div>
+                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{text.notes}</div>
+                  <div className={['mt-1 text-sm break-words', isDark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>{data.user.notes || '-'}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
               { label: text.statAsInviter, value: data.summary.asInviterCount },
