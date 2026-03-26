@@ -112,9 +112,9 @@ function getTexts(locale: Locale) {
         enableInviteProgram: 'Enable Invite Program',
         allowInviteBinding: 'Allow Pay-Page Binding',
         enableInviteReward: 'Enable Invite Rewards',
-        balanceInviterRewardAmount: 'Balance Top-Up Inviter Reward (USD)',
-        balanceInviteeRewardAmount: 'Balance Top-Up Invitee Reward (USD)',
-        inviteConfigHint: 'Invite toggles live here. Balance-top-up reward amounts are configured below; subscription reward amounts remain on each subscription plan.',
+        balanceInviterRewardPercent: 'Balance Top-Up Inviter Reward (%)',
+        balanceInviteeRewardPercent: 'Balance Top-Up Invitee Reward (%)',
+        inviteConfigHint: 'Invite toggles live here. Balance-top-up rewards are calculated by credited USD percentage below; subscription reward amounts remain on each subscription plan.',
         saveConfig: 'Save',
         savingConfig: 'Saving...',
         configSaved: 'Configuration saved',
@@ -181,9 +181,9 @@ function getTexts(locale: Locale) {
         enableInviteProgram: '启用邀请体系',
         allowInviteBinding: '允许支付页绑定',
         enableInviteReward: '启用邀请奖励',
-        balanceInviterRewardAmount: '余额充值邀请人奖励（USD）',
-        balanceInviteeRewardAmount: '余额充值被邀请人奖励（USD）',
-        inviteConfigHint: '这里控制邀请功能开关；余额充值返利额度在下方配置，订阅奖励额度仍在订阅管理里配置。',
+        balanceInviterRewardPercent: '余额充值邀请人返利比例（%）',
+        balanceInviteeRewardPercent: '余额充值被邀请人返利比例（%）',
+        inviteConfigHint: '这里控制邀请功能开关；余额充值返利按下方百分比 × 到账 USD 余额计算，订阅奖励额度仍在订阅管理里配置。',
         saveConfig: '保存',
         savingConfig: '保存中...',
         configSaved: '配置已保存',
@@ -256,8 +256,8 @@ function ChannelsContent() {
   const [inviteProgramEnabled, setInviteProgramEnabled] = useState(false);
   const [inviteBindingEnabled, setInviteBindingEnabled] = useState(false);
   const [inviteRewardEnabled, setInviteRewardEnabled] = useState(false);
-  const [balanceInviterRewardAmount, setBalanceInviterRewardAmount] = useState('');
-  const [balanceInviteeRewardAmount, setBalanceInviteeRewardAmount] = useState('');
+  const [balanceInviterRewardPercent, setBalanceInviterRewardPercent] = useState('');
+  const [balanceInviteeRewardPercent, setBalanceInviteeRewardPercent] = useState('');
   const [rcSaving, setRcSaving] = useState(false);
 
   // Sync modal state
@@ -305,8 +305,8 @@ function ChannelsContent() {
           if (c.key === 'INVITE_PROGRAM_ENABLED') setInviteProgramEnabled(c.value === 'true');
           if (c.key === 'INVITE_BINDING_ENABLED') setInviteBindingEnabled(c.value === 'true');
           if (c.key === 'INVITE_REWARD_ENABLED') setInviteRewardEnabled(c.value === 'true');
-          if (c.key === 'INVITE_BALANCE_INVITER_REWARD_AMOUNT') setBalanceInviterRewardAmount(c.value);
-          if (c.key === 'INVITE_BALANCE_INVITEE_REWARD_AMOUNT') setBalanceInviteeRewardAmount(c.value);
+          if (c.key === 'INVITE_BALANCE_INVITER_REWARD_PERCENT') setBalanceInviterRewardPercent(c.value);
+          if (c.key === 'INVITE_BALANCE_INVITEE_REWARD_PERCENT') setBalanceInviteeRewardPercent(c.value);
         }
       }
     } catch {
@@ -353,16 +353,16 @@ function ChannelsContent() {
               label: '邀请奖励开关',
             },
             {
-              key: 'INVITE_BALANCE_INVITER_REWARD_AMOUNT',
-              value: balanceInviterRewardAmount.trim(),
+              key: 'INVITE_BALANCE_INVITER_REWARD_PERCENT',
+              value: balanceInviterRewardPercent.trim(),
               group: 'invite',
-              label: '余额充值邀请人奖励',
+              label: '余额充值邀请人返利比例',
             },
             {
-              key: 'INVITE_BALANCE_INVITEE_REWARD_AMOUNT',
-              value: balanceInviteeRewardAmount.trim(),
+              key: 'INVITE_BALANCE_INVITEE_REWARD_PERCENT',
+              value: balanceInviteeRewardPercent.trim(),
               group: 'invite',
-              label: '余额充值被邀请人奖励',
+              label: '余额充值被邀请人返利比例',
             },
           ],
         }),
@@ -757,27 +757,27 @@ function ChannelsContent() {
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelCls}>{t.balanceInviterRewardAmount}</label>
+            <label className={labelCls}>{t.balanceInviterRewardPercent}</label>
             <input
               type="number"
               min="0"
               step="0.01"
-              value={balanceInviterRewardAmount}
-              onChange={(e) => setBalanceInviterRewardAmount(e.target.value)}
+              value={balanceInviterRewardPercent}
+              onChange={(e) => setBalanceInviterRewardPercent(e.target.value)}
               className={inputCls}
-              placeholder="0.00"
+              placeholder="5"
             />
           </div>
           <div>
-            <label className={labelCls}>{t.balanceInviteeRewardAmount}</label>
+            <label className={labelCls}>{t.balanceInviteeRewardPercent}</label>
             <input
               type="number"
               min="0"
               step="0.01"
-              value={balanceInviteeRewardAmount}
-              onChange={(e) => setBalanceInviteeRewardAmount(e.target.value)}
+              value={balanceInviteeRewardPercent}
+              onChange={(e) => setBalanceInviteeRewardPercent(e.target.value)}
               className={inputCls}
-              placeholder="0.00"
+              placeholder="5"
             />
           </div>
         </div>

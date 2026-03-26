@@ -79,11 +79,16 @@ function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
   return value ? Number(value.toString()) : 0;
 }
 
-function normalizeRewardAmount(value?: string): number {
+function normalizeRewardPercent(value?: string): number {
   if (!value) return 0;
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return Math.round(amount * 100) / 100;
+  const percent = Number(value);
+  if (!Number.isFinite(percent) || percent <= 0) return 0;
+  return Math.round(percent * 100) / 100;
+}
+
+function calcRewardByPercent(baseAmount: number, percent: number): number {
+  if (!Number.isFinite(baseAmount) || baseAmount <= 0 || !Number.isFinite(percent) || percent <= 0) return 0;
+  return Math.round(baseAmount * percent) / 100;
 }
 
 function buildRewardIdempotencyKey(orderId: string, role: InviteRewardRole): string {
@@ -225,14 +230,14 @@ export async function bindInviteCodeForUser(userId: number, rawInviteCode: strin
 async function prepareInviteRewardGrants(orderId: string) {
   const [flags, balanceRewardConfigs] = await Promise.all([
     getInviteFeatureFlags(),
-    getSystemConfigs(['INVITE_BALANCE_INVITER_REWARD_AMOUNT', 'INVITE_BALANCE_INVITEE_REWARD_AMOUNT']),
+    getSystemConfigs(['INVITE_BALANCE_INVITER_REWARD_PERCENT', 'INVITE_BALANCE_INVITEE_REWARD_PERCENT']),
   ]);
   if (!flags.programEnabled || !flags.rewardEnabled) {
     return { reason: 'reward_disabled', grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>> };
   }
 
-  const balanceInviterAmount = normalizeRewardAmount(balanceRewardConfigs.INVITE_BALANCE_INVITER_REWARD_AMOUNT);
-  const balanceInviteeAmount = normalizeRewardAmount(balanceRewardConfigs.INVITE_BALANCE_INVITEE_REWARD_AMOUNT);
+  const balanceInviterPercent = normalizeRewardPercent(balanceRewardConfigs.INVITE_BALANCE_INVITER_REWARD_PERCENT);
+  const balanceInviteePercent = normalizeRewardPercent(balanceRewardConfigs.INVITE_BALANCE_INVITEE_REWARD_PERCENT);
 
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
@@ -245,6 +250,7 @@ async function prepareInviteRewardGrants(orderId: string) {
         planId: true,
         paidAt: true,
         completedAt: true,
+        creditAmount: true,
       },
     });
 
@@ -296,8 +302,9 @@ async function prepareInviteRewardGrants(orderId: string) {
       inviterAmount = decimalToNumber(plan.inviterRewardAmount);
       inviteeAmount = decimalToNumber(plan.inviteeRewardAmount);
     } else {
-      inviterAmount = balanceInviterAmount;
-      inviteeAmount = balanceInviteeAmount;
+      const baseCreditAmount = decimalToNumber(order.creditAmount) || 0;
+      inviterAmount = calcRewardByPercent(baseCreditAmount, balanceInviterPercent);
+      inviteeAmount = calcRewardByPercent(baseCreditAmount, balanceInviteePercent);
 
       if (inviterAmount <= 0 && inviteeAmount <= 0) {
         return {
