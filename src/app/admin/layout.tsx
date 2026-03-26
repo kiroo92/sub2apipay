@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { path: '/admin/orders', label: { zh: '订单管理', en: 'Orders' } },
   { path: '/admin/channels', label: { zh: '渠道管理', en: 'Channels' } },
   { path: '/admin/subscriptions', label: { zh: '订阅管理', en: 'Subscriptions' } },
+  { path: '/admin/invites', label: { zh: '邀请管理', en: 'Invites' } },
 ];
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
