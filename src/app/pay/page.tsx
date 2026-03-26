@@ -380,6 +380,192 @@ function PayContent() {
   const bindPageUrl = buildScopedUrl('/bind');
   const ordersUrl = isMobile ? mobileOrdersUrl : pcOrdersUrl;
 
+  const renderTopUpSection = ({ className = 'mt-6', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
+    <div className={className}>
+      {/* 按量付费说明 banner */}
+      <div
+        className={[
+          'mb-6 rounded-2xl border p-6',
+          isDark
+            ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10'
+            : 'border-emerald-500/20 bg-gradient-to-r from-emerald-50 to-cyan-50',
+        ].join(' ')}
+      >
+        <div className="flex items-start gap-4">
+          <div
+            className={[
+              'flex-shrink-0 rounded-lg p-2',
+              isDark ? 'bg-emerald-500/20' : 'bg-emerald-500/15',
+            ].join(' ')}
+          >
+            <svg
+              className="h-6 w-6 text-emerald-500"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3
+              className={[
+                'text-lg font-semibold mb-2',
+                isDark ? 'text-emerald-400' : 'text-emerald-700',
+              ].join(' ')}
+            >
+              {pickLocaleText(locale, '按量付费模式', 'Pay-as-you-go')}
+            </h3>
+            <p className={['text-sm mb-4', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+              {pickLocaleText(
+                locale,
+                `充值后到账的是通用美元余额，可用于全部模型与可用端点的按量消费。当前汇率为 ¥${config.balanceExchangeRate.toFixed(2)} 可兑 1$ 余额，且仅支持整数充值，最低 ${config.minBalanceAmount}$。`,
+                `Top-ups add general USD balance for pay-as-you-go usage across all models and available endpoints. Current rate is CNY ${config.balanceExchangeRate.toFixed(2)} for $1 balance, with whole-dollar top-ups only and a minimum of $${config.minBalanceAmount}.`,
+              )}
+            </p>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div
+                className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}
+              >
+                <svg
+                  className="h-4 w-4 text-green-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                  <polyline points="17 6 23 6 23 12" />
+                </svg>
+                <span>{pickLocaleText(locale, '余额适用于全部模型', 'Balance works for all models')}</span>
+              </div>
+              <div
+                className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}
+              >
+                <svg
+                  className="h-4 w-4 text-blue-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>
+                  {pickLocaleText(
+                    locale,
+                    `¥${config.balanceExchangeRate.toFixed(2)}可兑1$余额`,
+                    `CNY ${config.balanceExchangeRate.toFixed(2)} for $1 balance`,
+                  )}
+                </span>
+              </div>
+              <div
+                className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}
+              >
+                <svg
+                  className="h-4 w-4 text-cyan-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M7 12h10M9 17h6" />
+                </svg>
+                <span>
+                  {pickLocaleText(
+                    locale,
+                    `仅支持整数充值，单次至少 ${config.minBalanceAmount}$`,
+                    `Whole-dollar top-ups only, minimum $${config.minBalanceAmount}`,
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {hasChannels ? (
+        <ChannelGrid
+          channels={channels}
+          onTopUp={() => setShowTopUpForm(true)}
+          isDark={isDark}
+          locale={locale}
+          userBalance={userInfo?.balance}
+        />
+      ) : (
+        <PaymentForm
+          userId={resolvedUserId ?? 0}
+          userName={userInfo?.username}
+          userBalance={userInfo?.balance}
+          enabledPaymentTypes={config.enabledPaymentTypes}
+          methodLimits={config.methodLimits}
+          minBalanceAmount={config.minBalanceAmount}
+          maxBalanceAmount={config.maxBalanceAmount}
+          balanceExchangeRate={config.balanceExchangeRate}
+          onSubmit={handleSubmit}
+          loading={loading}
+          dark={isDark}
+          pendingBlocked={pendingBlocked}
+          pendingCount={pendingCount}
+          locale={locale}
+        />
+      )}
+
+      {includeHelp && renderHelpSection()}
+    </div>
+  );
+
+  const renderSubscribeSection = ({ className = 'mt-6', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
+    <div className={className}>
+      <div
+        className={[
+          'mb-6 rounded-2xl border p-5',
+          isDark ? 'border-amber-500/25 bg-amber-500/10' : 'border-amber-200 bg-amber-50',
+        ].join(' ')}
+      >
+        <div className={['text-sm font-semibold', isDark ? 'text-amber-200' : 'text-amber-800'].join(' ')}>
+          {pickLocaleText(locale, '套餐说明', 'Plan Notes')}
+        </div>
+        <p className={['mt-2 text-sm leading-6', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
+          {pickLocaleText(
+            locale,
+            '套餐是指定模型/端点的固定权益，只能用于套餐列出的范围；套餐需直接支付购买，账户余额不能抵扣或兑换套餐。',
+            'Plans grant fixed access to specific models/endpoints only. They must be purchased directly and account balance cannot be applied or redeemed for them.',
+          )}
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {plans.map((plan) => (
+          <SubscriptionPlanCard
+            key={plan.id}
+            plan={plan}
+            onSubscribe={() => setSelectedPlan(plan)}
+            isDark={isDark}
+            locale={locale}
+          />
+        ))}
+      </div>
+
+      {includeHelp && renderHelpSection()}
+    </div>
+  );
+
+  const renderOrdersSection = (className = 'mt-8') => (
+    <div className={className}>
+      <MobileOrderList
+        isDark={isDark}
+        hasToken={hasToken}
+        orders={myOrders}
+        hasMore={ordersHasMore}
+        loadingMore={ordersLoadingMore}
+        onRefresh={loadUserAndOrders}
+        onLoadMore={loadMoreOrders}
+        locale={locale}
+      />
+    </div>
+  );
+
   // ── 余额充值提交 ──
   const handleSubmit = async (amount: number, paymentType: string) => {
     if (pendingBlocked) {
@@ -703,194 +889,29 @@ function PayContent() {
             !selectedPlan &&
             !showTopUpForm && (
               <>
-                <MainTabs
-                  activeTab={!canTopUp ? 'subscribe' : mainTab}
-                  onTabChange={setMainTab}
-                  showSubscribeTab={hasPlans}
-                  showTopUpTab={canTopUp}
-                  isDark={isDark}
-                  locale={locale}
-                />
+                {isMobile ? (
+                  <>
+                    <MainTabs
+                      activeTab={!canTopUp ? 'subscribe' : mainTab}
+                      onTabChange={setMainTab}
+                      showSubscribeTab={hasPlans}
+                      showTopUpTab={canTopUp}
+                      isDark={isDark}
+                      locale={locale}
+                    />
 
-                {mainTab === 'topup' && canTopUp && (
-                  <div className="mt-6">
-                    {/* 按量付费说明 banner */}
-                    <div
-                      className={[
-                        'mb-6 rounded-2xl border p-6',
-                        isDark
-                          ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10'
-                          : 'border-emerald-500/20 bg-gradient-to-r from-emerald-50 to-cyan-50',
-                      ].join(' ')}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div
-                          className={[
-                            'flex-shrink-0 rounded-lg p-2',
-                            isDark ? 'bg-emerald-500/20' : 'bg-emerald-500/15',
-                          ].join(' ')}
-                        >
-                          <svg
-                            className="h-6 w-6 text-emerald-500"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                          </svg>
-                        </div>
-                        <div className="flex-1">
-                          <h3
-                            className={[
-                              'text-lg font-semibold mb-2',
-                              isDark ? 'text-emerald-400' : 'text-emerald-700',
-                            ].join(' ')}
-                          >
-                            {pickLocaleText(locale, '按量付费模式', 'Pay-as-you-go')}
-                          </h3>
-                          <p className={['text-sm mb-4', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-                            {pickLocaleText(
-                              locale,
-                              `充值后到账的是通用美元余额，可用于全部模型与可用端点的按量消费。当前汇率为 ¥${config.balanceExchangeRate.toFixed(2)} 可兑 1$ 余额，且仅支持整数充值，最低 ${config.minBalanceAmount}$。`,
-                              `Top-ups add general USD balance for pay-as-you-go usage across all models and available endpoints. Current rate is CNY ${config.balanceExchangeRate.toFixed(2)} for $1 balance, with whole-dollar top-ups only and a minimum of $${config.minBalanceAmount}.`,
-                            )}
-                          </p>
-                          <div className="flex flex-wrap gap-4 text-sm">
-                            <div
-                              className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(
-                                ' ',
-                              )}
-                            >
-                              <svg
-                                className="h-4 w-4 text-green-500"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                                <polyline points="17 6 23 6 23 12" />
-                              </svg>
-                              <span>
-                                {pickLocaleText(locale, '余额适用于全部模型', 'Balance works for all models')}
-                              </span>
-                            </div>
-                            <div
-                              className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(
-                                ' ',
-                              )}
-                            >
-                              <svg
-                                className="h-4 w-4 text-blue-500"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                              </svg>
-                              <span>
-                                {pickLocaleText(
-                                  locale,
-                                  `¥${config.balanceExchangeRate.toFixed(2)}可兑1$余额`,
-                                  `CNY ${config.balanceExchangeRate.toFixed(2)} for $1 balance`,
-                                )}
-                              </span>
-                            </div>
-                            <div
-                              className={['flex items-center gap-2', isDark ? 'text-slate-400' : 'text-slate-500'].join(
-                                ' ',
-                              )}
-                            >
-                              <svg
-                                className="h-4 w-4 text-cyan-500"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M7 12h10M9 17h6" />
-                              </svg>
-                              <span>
-                                {pickLocaleText(
-                                  locale,
-                                  `仅支持整数充值，单次至少 ${config.minBalanceAmount}$`,
-                                  `Whole-dollar top-ups only, minimum $${config.minBalanceAmount}`,
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {hasChannels ? (
-                      <ChannelGrid
-                        channels={channels}
-                        onTopUp={() => setShowTopUpForm(true)}
-                        isDark={isDark}
-                        locale={locale}
-                        userBalance={userInfo?.balance}
-                      />
-                    ) : (
-                      <PaymentForm
-                        userId={resolvedUserId ?? 0}
-                        userName={userInfo?.username}
-                        userBalance={userInfo?.balance}
-                        enabledPaymentTypes={config.enabledPaymentTypes}
-                        methodLimits={config.methodLimits}
-                        minBalanceAmount={config.minBalanceAmount}
-                        maxBalanceAmount={config.maxBalanceAmount}
-                        balanceExchangeRate={config.balanceExchangeRate}
-                        onSubmit={handleSubmit}
-                        loading={loading}
-                        dark={isDark}
-                        pendingBlocked={pendingBlocked}
-                        pendingCount={pendingCount}
-                        locale={locale}
-                      />
-                    )}
-
-                    {renderHelpSection()}
-                  </div>
-                )}
-
-                {mainTab === 'subscribe' && (
-                  <div className="mt-6">
-                    <div
-                      className={[
-                        'mb-6 rounded-2xl border p-5',
-                        isDark ? 'border-amber-500/25 bg-amber-500/10' : 'border-amber-200 bg-amber-50',
-                      ].join(' ')}
-                    >
-                      <div
-                        className={['text-sm font-semibold', isDark ? 'text-amber-200' : 'text-amber-800'].join(' ')}
-                      >
-                        {pickLocaleText(locale, '套餐说明', 'Plan Notes')}
-                      </div>
-                      <p className={['mt-2 text-sm leading-6', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
-                        {pickLocaleText(
-                          locale,
-                          '套餐是指定模型/端点的固定权益，只能用于套餐列出的范围；套餐需直接支付购买，账户余额不能抵扣或兑换套餐。',
-                          'Plans grant fixed access to specific models/endpoints only. They must be purchased directly and account balance cannot be applied or redeemed for them.',
-                        )}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {plans.map((plan) => (
-                        <SubscriptionPlanCard
-                          key={plan.id}
-                          plan={plan}
-                          onSubscribe={() => setSelectedPlan(plan)}
-                          isDark={isDark}
-                          locale={locale}
-                        />
-                      ))}
-                    </div>
-
-                    {renderHelpSection()}
-                  </div>
+                    {mainTab === 'topup' && canTopUp && renderTopUpSection()}
+                    {mainTab === 'subscribe' && hasPlans && renderSubscribeSection()}
+                  </>
+                ) : (
+                  <>
+                    {canTopUp && renderTopUpSection({ className: 'mt-6', includeHelp: false })}
+                    {hasPlans &&
+                      renderSubscribeSection({
+                        className: canTopUp ? 'mt-8' : 'mt-6',
+                        includeHelp: false,
+                      })}
+                  </>
                 )}
 
                 {/* 用户已有订阅 — 所有 tab 共用 */}
@@ -917,6 +938,9 @@ function PayContent() {
                 )}
 
                 <PurchaseFlow isDark={isDark} locale={locale} />
+
+                {!isMobile && hasHelpContent && renderHelpSection()}
+                {!isMobile && renderOrdersSection()}
               </>
             )}
 
