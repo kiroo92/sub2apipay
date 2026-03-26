@@ -56,7 +56,6 @@ function PayContent() {
   const token = (searchParams.get('token') || '').trim();
   const theme = searchParams.get('theme') === 'dark' ? 'dark' : 'light';
   const uiMode = searchParams.get('ui_mode') || 'standalone';
-  const tab = searchParams.get('tab');
   const srcHost = searchParams.get('src_host') || undefined;
   const srcUrl = searchParams.get('src_url') || undefined;
   const locale = resolveLocale(searchParams.get('lang'));
@@ -76,7 +75,6 @@ function PayContent() {
   const [ordersPage, setOrdersPage] = useState(1);
   const [ordersHasMore, setOrdersHasMore] = useState(false);
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
-  const [activeMobileTab, setActiveMobileTab] = useState<'pay' | 'orders'>('pay');
   const [pendingCount, setPendingCount] = useState(0);
 
   // 新增状态
@@ -156,14 +154,6 @@ function PayContent() {
     setIsMobile(detectDeviceIsMobile());
   }, []);
 
-  useEffect(() => {
-    if (!isMobile || step !== 'form') return;
-    if (tab === 'orders') {
-      setActiveMobileTab('orders');
-      return;
-    }
-    setActiveMobileTab('pay');
-  }, [isMobile, step, tab]);
 
   const loadUserAndOrders = useCallback(async () => {
     if (!token) return;
@@ -375,10 +365,7 @@ function PayContent() {
     return `${path}?${params.toString()}`;
   };
 
-  const pcOrdersUrl = buildScopedUrl('/pay/orders');
-  const mobileOrdersUrl = buildScopedUrl('/pay', true);
   const bindPageUrl = buildScopedUrl('/bind');
-  const ordersUrl = isMobile ? mobileOrdersUrl : pcOrdersUrl;
 
   const renderTopUpSection = ({ className = 'mt-6', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
     <div className={className}>
@@ -689,7 +676,6 @@ function PayContent() {
   const handleStatusChange = (order: PublicOrderStatusSnapshot) => {
     setFinalOrderState(order);
     setStep('result');
-    if (isMobile) setActiveMobileTab('orders');
   };
 
   const handleBack = () => {
@@ -727,34 +713,21 @@ function PayContent() {
       locale={locale}
       actions={
         !isMobile ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                loadUserAndOrders();
-                loadChannelsAndPlans();
-              }}
-              className={[
-                'inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                isDark
-                  ? 'border-slate-600 text-slate-200 hover:bg-slate-800'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-100',
-              ].join(' ')}
-            >
-              {pickLocaleText(locale, '刷新', 'Refresh')}
-            </button>
-            <a
-              href={ordersUrl}
-              className={[
-                'inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                isDark
-                  ? 'border-slate-600 text-slate-200 hover:bg-slate-800'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-100',
-              ].join(' ')}
-            >
-              {pickLocaleText(locale, '我的订单', 'My Orders')}
-            </a>
-          </>
+          <button
+            type="button"
+            onClick={() => {
+              loadUserAndOrders();
+              loadChannelsAndPlans();
+            }}
+            className={[
+              'inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+              isDark
+                ? 'border-slate-600 text-slate-200 hover:bg-slate-800'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-100',
+            ].join(' ')}
+          >
+            {pickLocaleText(locale, '刷新', 'Refresh')}
+          </button>
         ) : undefined
       }
     >
@@ -796,49 +769,6 @@ function PayContent() {
       {/* ── 表单阶段 ── */}
       {step === 'form' && (
         <>
-          {/* 移动端 Tab：充值/订单 */}
-          {isMobile && (
-            <div
-              className={[
-                'mb-4 grid grid-cols-2 rounded-xl border p-1',
-                isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-300 bg-slate-100/90',
-              ].join(' ')}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveMobileTab('pay')}
-                className={[
-                  'rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200',
-                  activeMobileTab === 'pay'
-                    ? isDark
-                      ? 'bg-indigo-500/30 text-indigo-100 ring-1 ring-indigo-300/35 shadow-sm'
-                      : 'bg-white text-slate-900 ring-1 ring-slate-300 shadow-md shadow-slate-300/50'
-                    : isDark
-                      ? 'text-slate-400 hover:text-slate-200'
-                      : 'text-slate-500 hover:text-slate-700',
-                ].join(' ')}
-              >
-                {pickLocaleText(locale, '充值', 'Recharge')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveMobileTab('orders')}
-                className={[
-                  'rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200',
-                  activeMobileTab === 'orders'
-                    ? isDark
-                      ? 'bg-indigo-500/30 text-indigo-100 ring-1 ring-indigo-300/35 shadow-sm'
-                      : 'bg-white text-slate-900 ring-1 ring-slate-300 shadow-md shadow-slate-300/50'
-                    : isDark
-                      ? 'text-slate-400 hover:text-slate-200'
-                      : 'text-slate-500 hover:text-slate-700',
-                ].join(' ')}
-              >
-                {pickLocaleText(locale, '我的订单', 'My Orders')}
-              </button>
-            </div>
-          )}
-
           {/* 加载中 */}
           {(!channelsLoaded || !userLoaded) && !allEntriesClosed && (
             <div className="flex items-center justify-center py-12">
@@ -850,7 +780,7 @@ function PayContent() {
           )}
 
           {/* R7: 所有入口关闭提示 */}
-          {allEntriesClosed && (activeMobileTab === 'pay' || !isMobile) && (
+          {allEntriesClosed && (
             <div
               className={[
                 'rounded-2xl border p-8 text-center',
@@ -885,7 +815,6 @@ function PayContent() {
           {/* ── 有渠道配置：新版UI ── */}
           {channelsLoaded &&
             showMainTabs &&
-            (activeMobileTab === 'pay' || !isMobile) &&
             !selectedPlan &&
             !showTopUpForm && (
               <>
@@ -940,7 +869,7 @@ function PayContent() {
                 <PurchaseFlow isDark={isDark} locale={locale} />
 
                 {!isMobile && hasHelpContent && renderHelpSection()}
-                {!isMobile && renderOrdersSection()}
+                {renderOrdersSection(isMobile ? 'mt-6' : 'mt-8')}
               </>
             )}
 
@@ -1000,7 +929,7 @@ function PayContent() {
           {channelsLoaded && userLoaded && !showMainTabs && canTopUp && !selectedPlan && (
             <>
               {isMobile ? (
-                activeMobileTab === 'pay' ? (
+                <>
                   <PaymentForm
                     userId={resolvedUserId ?? 0}
                     userName={userInfo?.username}
@@ -1017,18 +946,9 @@ function PayContent() {
                     pendingCount={pendingCount}
                     locale={locale}
                   />
-                ) : (
-                  <MobileOrderList
-                    isDark={isDark}
-                    hasToken={hasToken}
-                    orders={myOrders}
-                    hasMore={ordersHasMore}
-                    loadingMore={ordersLoadingMore}
-                    onRefresh={loadUserAndOrders}
-                    onLoadMore={loadMoreOrders}
-                    locale={locale}
-                  />
-                )
+                  {renderHelpSection()}
+                  {renderOrdersSection('mt-6')}
+                </>
               ) : (
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.8fr)]">
                   <div className="min-w-0">
@@ -1112,20 +1032,6 @@ function PayContent() {
                 </div>
               )}
             </>
-          )}
-
-          {/* 移动端订单列表 */}
-          {isMobile && activeMobileTab === 'orders' && showMainTabs && (
-            <MobileOrderList
-              isDark={isDark}
-              hasToken={hasToken}
-              orders={myOrders}
-              hasMore={ordersHasMore}
-              loadingMore={ordersLoadingMore}
-              onRefresh={loadUserAndOrders}
-              onLoadMore={loadMoreOrders}
-              locale={locale}
-            />
           )}
         </>
       )}
