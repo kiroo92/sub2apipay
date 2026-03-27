@@ -203,6 +203,14 @@ export async function bindInviteCodeForUser(userId: number, rawInviteCode: strin
         throw new InviteError('SELF_BIND_FORBIDDEN', '不能绑定自己的邀请码', 400);
       }
 
+      const reverseBinding = await tx.inviteBinding.findUnique({
+        where: { inviteeUserId: inviterCode.userId },
+        select: { inviterUserId: true },
+      });
+      if (reverseBinding?.inviterUserId === userId) {
+        throw new InviteError('MUTUAL_BIND_FORBIDDEN', '不能与已邀请你的用户互相绑定', 409);
+      }
+
       return tx.inviteBinding.create({
         data: {
           inviterUserId: inviterCode.userId,
