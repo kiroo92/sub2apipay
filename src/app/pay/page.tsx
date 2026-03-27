@@ -366,12 +366,12 @@ function PayContent() {
 
   const bindPageUrl = buildScopedUrl('/bind');
 
-  const renderTopUpSection = ({ className = 'mt-6', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
+  const renderTopUpSection = ({ className = 'mt-4', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
     <div className={className}>
       {/* 按量付费说明 banner */}
       <div
         className={[
-          'mb-6 rounded-2xl border p-6',
+          'mb-4 rounded-xl border p-4',
           isDark
             ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10'
             : 'border-emerald-500/20 bg-gradient-to-r from-emerald-50 to-cyan-50',
@@ -502,7 +502,7 @@ function PayContent() {
     </div>
   );
 
-  const renderSubscribeSection = ({ className = 'mt-6', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
+  const renderSubscribeSection = ({ className = 'mt-4', includeHelp = true }: { className?: string; includeHelp?: boolean } = {}) => (
     <div className={className}>
       <div
         className={[
@@ -537,7 +537,7 @@ function PayContent() {
     </div>
   );
 
-  const renderOrdersSection = (className = 'mt-8') => (
+  const renderOrdersSection = (className = 'mt-6') => (
     <section className={className}>
       <div
         className={[
@@ -891,10 +891,10 @@ function PayContent() {
                   </>
                 ) : (
                   <>
-                    {canTopUp && renderTopUpSection({ className: 'mt-6', includeHelp: false })}
+                    {canTopUp && renderTopUpSection({ className: 'mt-4', includeHelp: false })}
                     {hasPlans &&
                       renderSubscribeSection({
-                        className: canTopUp ? 'mt-8' : 'mt-6',
+                        className: canTopUp ? 'mt-5' : 'mt-4',
                         includeHelp: false,
                       })}
                   </>
@@ -902,7 +902,7 @@ function PayContent() {
 
                 {/* 用户已有订阅 — 所有 tab 共用 */}
                 {userSubscriptions.length > 0 && (
-                  <div className="mt-8">
+                  <div className="mt-6">
                     <h3
                       className={['text-lg font-semibold mb-3', isDark ? 'text-slate-200' : 'text-slate-800'].join(' ')}
                     >
@@ -926,7 +926,7 @@ function PayContent() {
                 <PurchaseFlow isDark={isDark} locale={locale} />
 
                 {!isMobile && hasHelpContent && renderHelpSection()}
-                {renderOrdersSection(isMobile ? 'mt-6' : 'mt-8')}
+                {renderOrdersSection(isMobile ? 'mt-5' : 'mt-6')}
               </>
             )}
 

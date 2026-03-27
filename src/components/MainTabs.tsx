@@ -33,7 +33,7 @@ export default function MainTabs({
   if (tabs.length <= 1) return null;
 
   return (
-    <div className={['inline-flex rounded-xl p-1', isDark ? 'bg-slate-900' : 'bg-slate-100'].join(' ')}>
+    <div className={['inline-flex rounded-lg p-0.5', isDark ? 'bg-slate-900' : 'bg-slate-100'].join(' ')}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
@@ -42,7 +42,7 @@ export default function MainTabs({
             type="button"
             onClick={() => onTabChange(tab.key)}
             className={[
-              'rounded-lg px-5 py-2 text-sm font-medium transition-all',
+              'rounded-md px-4 py-1.5 text-sm font-medium transition-all',
               isActive
                 ? isDark
                   ? 'bg-slate-700 text-slate-100 shadow-sm'

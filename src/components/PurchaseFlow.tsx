@@ -70,11 +70,11 @@ export default function PurchaseFlow({ isDark, locale }: PurchaseFlowProps) {
   return (
     <div
       className={[
-        'rounded-2xl border p-6',
+        'rounded-xl border px-4 py-3',
         isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50',
       ].join(' ')}
     >
-      <h3 className={['mb-5 text-center text-sm font-medium', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+      <h3 className={['mb-3 text-center text-xs font-medium', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
         {pickLocaleText(locale, '购买流程', 'How It Works')}
       </h3>
 
@@ -83,23 +83,23 @@ export default function PurchaseFlow({ isDark, locale }: PurchaseFlowProps) {
         {STEPS.map((step, idx) => (
           <React.Fragment key={idx}>
             {/* Step */}
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5">
               <div
                 className={[
-                  'flex h-12 w-12 items-center justify-center rounded-full',
+                  'flex h-10 w-10 items-center justify-center rounded-full',
                   isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-600',
                 ].join(' ')}
               >
                 {step.icon}
               </div>
-              <span className={['text-xs font-medium', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
+              <span className={['text-[11px] font-medium', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
                 {pickLocaleText(locale, step.zh, step.en)}
               </span>
             </div>
 
             {/* Connector */}
             {idx < STEPS.length - 1 && (
-              <div className={['mx-4 h-px w-12 flex-shrink-0', isDark ? 'bg-slate-700' : 'bg-slate-300'].join(' ')} />
+              <div className={['mx-3 h-px w-10 flex-shrink-0', isDark ? 'bg-slate-700' : 'bg-slate-300'].join(' ')} />
             )}
           </React.Fragment>
         ))}
