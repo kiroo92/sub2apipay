@@ -32,7 +32,7 @@ interface PaymentFormProps {
   fixedAmount?: number;
 }
 
-const QUICK_AMOUNTS = [50, 200, 1000, 5000];
+const QUICK_AMOUNTS = [50, 200, 500, 1000, 5000];
 const INTEGER_TEXT_PATTERN = /^\d*$/;
 
 function roundMoney(num: number): number {
