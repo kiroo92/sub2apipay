@@ -102,6 +102,19 @@ function buildBadgeClass(status: InviteRewardRecord['status'], isDark: boolean) 
   }
 }
 
+function buildRolePillClass(kind: 'self' | 'counterparty', isDark: boolean) {
+  return [
+    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+    kind === 'self'
+      ? isDark
+        ? 'bg-cyan-500/15 text-cyan-300'
+        : 'bg-cyan-50 text-cyan-700'
+      : isDark
+        ? 'bg-violet-500/15 text-violet-300'
+        : 'bg-violet-50 text-violet-700',
+  ].join(' ');
+}
+
 function BindContent() {
   const searchParams = useSearchParams();
   const token = (searchParams.get('token') || '').trim();
@@ -269,6 +282,20 @@ function BindContent() {
       rewardSummary: pickLocaleText(locale, '累计返利', 'Total rewards'),
       rewardDoneSummary: pickLocaleText(locale, '已完成返利', 'Completed rewards'),
       relationSummary: pickLocaleText(locale, '邀请关系总数', 'Total relations'),
+      meAsInviter: pickLocaleText(locale, '我作为邀请人', 'Me as inviter'),
+      meAsInvitee: pickLocaleText(locale, '我作为被邀请人', 'Me as invitee'),
+      otherParty: pickLocaleText(locale, '对方', 'Counterparty'),
+      statusPending: pickLocaleText(locale, '待处理', 'Pending'),
+      statusProcessing: pickLocaleText(locale, '处理中', 'Processing'),
+      statusCompleted: pickLocaleText(locale, '已完成', 'Completed'),
+      statusFailed: pickLocaleText(locale, '失败', 'Failed'),
+      recipient: pickLocaleText(locale, '收款用户', 'Recipient'),
+      paymentMethod: pickLocaleText(locale, '支付方式', 'Payment method'),
+      orderAmount: pickLocaleText(locale, '订单金额', 'Order amount'),
+      creditAmount: pickLocaleText(locale, '到账金额', 'Credited amount'),
+      completedAt: pickLocaleText(locale, '完成时间', 'Completed at'),
+      failedReason: pickLocaleText(locale, '失败原因', 'Failure reason'),
+      processingAt: pickLocaleText(locale, '处理时间', 'Processing at'),
     }),
     [locale],
   );
@@ -464,27 +491,49 @@ function BindContent() {
             ) : activityTab === 'bindings' ? (
               <>
                 {activityData?.bindings.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-                          <th className="px-3 py-2 text-left">{tabText.inviter}</th>
-                          <th className="px-3 py-2 text-left">{tabText.invitee}</th>
-                          <th className="px-3 py-2 text-left">{tabText.inviteCode}</th>
-                          <th className="px-3 py-2 text-left">{tabText.createdAt}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activityData.bindings.map((item) => (
-                          <tr key={item.id} className={isDark ? 'border-t border-slate-700' : 'border-t border-slate-200'}>
-                            <td className="px-3 py-2">#{item.inviterUserId}</td>
-                            <td className="px-3 py-2">#{item.inviteeUserId}</td>
-                            <td className="px-3 py-2 font-mono">{item.inviteCode}</td>
-                            <td className="px-3 py-2">{formatDateTime(item.createdAt, locale)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-3">
+                    {activityData.bindings.map((item) => {
+                      const currentUserId = activityData.userId;
+                      const isMeInviter = item.inviterUserId === currentUserId;
+                      const counterpartyId = isMeInviter ? item.inviteeUserId : item.inviterUserId;
+                      return (
+                        <div
+                          key={item.id}
+                          className={[
+                            'rounded-xl border p-3 text-sm',
+                            isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50/80',
+                          ].join(' ')}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={buildRolePillClass('self', isDark)}>
+                                {isMeInviter ? tabText.meAsInviter : tabText.meAsInvitee}
+                              </span>
+                              <span className={buildRolePillClass('counterparty', isDark)}>
+                                {tabText.otherParty} #{counterpartyId}
+                              </span>
+                            </div>
+                            <div className={isDark ? 'text-slate-400 text-xs' : 'text-slate-500 text-xs'}>
+                              {formatDateTime(item.createdAt, locale)}
+                            </div>
+                          </div>
+                          <div className={['mt-3 grid gap-2 sm:grid-cols-2', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
+                            <div>
+                              {tabText.inviter}：#{item.inviterUserId}
+                            </div>
+                            <div>
+                              {tabText.invitee}：#{item.inviteeUserId}
+                            </div>
+                            <div>
+                              {tabText.inviteCode}：<span className="font-mono">{item.inviteCode}</span>
+                            </div>
+                            <div>
+                              {tabText.createdAt}：{formatDateTime(item.createdAt, locale)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className={isDark ? 'text-slate-400 text-sm' : 'text-slate-500 text-sm'}>{tabText.emptyBindings}</div>
@@ -495,50 +544,78 @@ function BindContent() {
               <>
                 {activityData?.rewards.length ? (
                   <div className="space-y-3">
-                    {activityData.rewards.map((item) => (
-                      <div
-                        key={item.id}
-                        className={[
-                          'rounded-xl border p-3 text-sm',
-                          isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50/80',
-                        ].join(' ')}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="font-medium">
-                            {item.order.orderType === 'subscription'
-                              ? pickLocaleText(locale, '订阅订单', 'Subscription order')
-                              : pickLocaleText(locale, '余额充值', 'Balance top-up')}{' '}
-                            #{item.orderId}
+                    {activityData.rewards.map((item) => {
+                      const statusText =
+                        item.status === 'COMPLETED'
+                          ? tabText.statusCompleted
+                          : item.status === 'FAILED'
+                            ? tabText.statusFailed
+                            : item.status === 'PROCESSING'
+                              ? tabText.statusProcessing
+                              : tabText.statusPending;
+                      return (
+                        <div
+                          key={item.id}
+                          className={[
+                            'rounded-xl border p-3 text-sm',
+                            isDark ? 'border-slate-700 bg-slate-900/40' : 'border-slate-200 bg-slate-50/80',
+                          ].join(' ')}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-medium">
+                              {item.order.orderType === 'subscription'
+                                ? pickLocaleText(locale, '订阅订单', 'Subscription order')
+                                : pickLocaleText(locale, '余额充值', 'Balance top-up')}{' '}
+                              #{item.orderId}
+                            </div>
+                            <span className={buildBadgeClass(item.status, isDark)}>{statusText}</span>
                           </div>
-                          <span className={buildBadgeClass(item.status, isDark)}>{item.status}</span>
+                          <div className={['mt-3 grid gap-2 sm:grid-cols-2', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
+                            <div>
+                              {tabText.role}：{item.role === 'INVITER' ? tabText.roleInviter : tabText.roleInvitee}
+                            </div>
+                            <div>
+                              {tabText.recipient}：#{item.recipientUserId}
+                            </div>
+                            <div>
+                              {tabText.amount}：{item.amount}
+                            </div>
+                            <div>
+                              {tabText.paymentMethod}：{item.order.paymentType || '-'}
+                            </div>
+                            <div>
+                              {tabText.orderAmount}：{item.order.amount}
+                            </div>
+                            <div>
+                              {tabText.creditAmount}：{item.order.creditAmount}
+                            </div>
+                            <div>
+                              {tabText.inviter}：#{item.binding.inviterUserId}
+                            </div>
+                            <div>
+                              {tabText.invitee}：#{item.binding.inviteeUserId}
+                            </div>
+                            <div>
+                              {tabText.inviteCode}：<span className="font-mono">{item.binding.inviteCode}</span>
+                            </div>
+                            <div>
+                              {tabText.createdAt}：{formatDateTime(item.createdAt, locale)}
+                            </div>
+                            <div>
+                              {tabText.completedAt}：{formatDateTime(item.completedAt, locale)}
+                            </div>
+                            <div>
+                              {tabText.processingAt}：{formatDateTime(item.processingAt, locale)}
+                            </div>
+                          </div>
+                          {item.failedReason ? (
+                            <div className={['mt-2 text-xs', isDark ? 'text-red-300' : 'text-red-600'].join(' ')}>
+                              {tabText.failedReason}：{item.failedReason}
+                            </div>
+                          ) : null}
                         </div>
-                        <div className={['mt-2 grid gap-2 sm:grid-cols-2', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
-                          <div>
-                            {tabText.role}：{item.role === 'INVITER' ? tabText.roleInviter : tabText.roleInvitee}
-                          </div>
-                          <div>
-                            {tabText.amount}：{item.amount}
-                          </div>
-                          <div>
-                            {tabText.inviter}：#{item.binding.inviterUserId}
-                          </div>
-                          <div>
-                            {tabText.invitee}：#{item.binding.inviteeUserId}
-                          </div>
-                          <div>
-                            {tabText.inviteCode}：<span className="font-mono">{item.binding.inviteCode}</span>
-                          </div>
-                          <div>
-                            {tabText.createdAt}：{formatDateTime(item.createdAt, locale)}
-                          </div>
-                        </div>
-                        {item.failedReason ? (
-                          <div className={['mt-2 text-xs', isDark ? 'text-red-300' : 'text-red-600'].join(' ')}>
-                            {item.failedReason}
-                          </div>
-                        ) : null}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className={isDark ? 'text-slate-400 text-sm' : 'text-slate-500 text-sm'}>{tabText.emptyRewards}</div>
