@@ -133,18 +133,18 @@ function BindContent() {
       isDark={isDark}
       isEmbedded={isEmbedded}
       maxWidth="lg"
-      title={pickLocaleText(locale, '绑定邀请码', 'Bind invite code')}
+      title={pickLocaleText(locale, '邀请绑定', 'Invite binding')}
       subtitle={
         displayName
           ? pickLocaleText(
               locale,
-              `为 ${displayName} 绑定一次性邀请关系`,
-              `Bind a one-time invite relationship for ${displayName}`,
+              `为 ${displayName} 绑定邀请码，后续符合条件的订单可获取邀请奖励`,
+              `Bind an invite code for ${displayName}. Eligible future orders can receive invite rewards.`,
             )
           : pickLocaleText(
               locale,
-              '完成一次性邀请绑定后再继续购买',
-              'Complete your one-time invite binding before purchasing',
+              '完成一次性邀请绑定后，后续符合条件的订单可获取邀请奖励',
+              'Complete the one-time invite binding to receive invite rewards on eligible future orders.',
             )
       }
       locale={locale}

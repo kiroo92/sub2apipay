@@ -13,7 +13,6 @@ import SubscriptionPlanCard from '@/components/SubscriptionPlanCard';
 import SubscriptionConfirm from '@/components/SubscriptionConfirm';
 import UserSubscriptions from '@/components/UserSubscriptions';
 import PurchaseFlow from '@/components/PurchaseFlow';
-import InviteBindingCard from '@/components/InviteBindingCard';
 import { resolveLocale, pickLocaleText, applyLocaleToSearchParams } from '@/lib/locale';
 import { detectDeviceIsMobile, applySublabelOverrides, type UserInfo, type MyOrder } from '@/lib/pay-utils';
 import type { PublicOrderStatusSnapshot } from '@/lib/order/status';
@@ -777,9 +776,50 @@ function PayContent() {
         </div>
       )}
 
-      {step === 'form' && (
-        <div className="mb-4">
-          <InviteBindingCard invite={inviteInfo} isDark={isDark} locale={locale} bindPageHref={bindPageUrl} />
+      {step === 'form' && inviteInfo?.programEnabled && (
+        <div
+          className={[
+            'mb-4 rounded-2xl border px-4 py-3',
+            isDark ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-white shadow-sm',
+          ].join(' ')}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className={['text-sm font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
+                {inviteInfo.binding
+                  ? pickLocaleText(locale, '已绑定邀请码，可参与邀请奖励', 'Invite code bound — eligible for invite rewards')
+                  : pickLocaleText(locale, '有邀请码？先去绑定，可获取邀请奖励', 'Have an invite code? Bind it first to get invite rewards')}
+              </div>
+              <p className={['mt-1 text-xs leading-5', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                {inviteInfo.binding
+                  ? pickLocaleText(
+                      locale,
+                      `当前已绑定 ${inviteInfo.binding.inviteCode}，后续符合条件的充值或套餐订单可按站点规则结算邀请奖励。`,
+                      `This account is already bound to ${inviteInfo.binding.inviteCode}. Eligible top-up or plan orders can follow the site's invite reward rules.`,
+                    )
+                  : pickLocaleText(
+                      locale,
+                      '支付页不再处理绑定；前往独立邀请页完成一次性绑定后，再回来下单即可。',
+                      'Binding is now handled on a dedicated invite page. Finish the one-time binding there, then return here to place your order.',
+                    )}
+              </p>
+            </div>
+            <a
+              href={bindPageUrl}
+              className={[
+                'inline-flex shrink-0 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                inviteInfo.binding
+                  ? isDark
+                    ? 'border border-slate-600 text-slate-200 hover:bg-slate-700'
+                    : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700',
+              ].join(' ')}
+            >
+              {inviteInfo.binding
+                ? pickLocaleText(locale, '查看邀请页', 'Open invite page')
+                : pickLocaleText(locale, '去绑定邀请码', 'Go bind invite code')}
+            </a>
+          </div>
         </div>
       )}
 
