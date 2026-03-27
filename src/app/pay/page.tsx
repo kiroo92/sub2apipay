@@ -506,22 +506,22 @@ function PayContent() {
     <div className={className}>
       <div
         className={[
-          'mb-6 rounded-2xl border p-5',
+          'mb-4 rounded-xl border px-4 py-3',
           isDark ? 'border-amber-500/25 bg-amber-500/10' : 'border-amber-200 bg-amber-50',
         ].join(' ')}
       >
         <div className={['text-sm font-semibold', isDark ? 'text-amber-200' : 'text-amber-800'].join(' ')}>
           {pickLocaleText(locale, '套餐说明', 'Plan Notes')}
         </div>
-        <p className={['mt-2 text-sm leading-6', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
+        <p className={['mt-1 text-xs leading-5', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
           {pickLocaleText(
             locale,
-            '套餐是指定模型/端点的固定权益，只能用于套餐列出的范围；套餐需直接支付购买，账户余额不能抵扣或兑换套餐。',
-            'Plans grant fixed access to specific models/endpoints only. They must be purchased directly and account balance cannot be applied or redeemed for them.',
+            '套餐仅适用于指定模型/端点，需直接支付购买，余额不可兑换。',
+            'Plans only apply to specified models/endpoints, require direct purchase, and cannot be redeemed with balance.',
           )}
         </p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {plans.map((plan) => (
           <SubscriptionPlanCard
             key={plan.id}
