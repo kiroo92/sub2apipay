@@ -56,7 +56,7 @@ describe('invite code routes', () => {
 
     expect(response.status).toBe(200);
     expect(mockGetCurrentUserByToken).toHaveBeenCalledWith('test-token');
-    expect(mockGetInviteInfoForUser).toHaveBeenCalledWith(7);
+    expect(mockGetInviteInfoForUser).toHaveBeenCalledWith(7, 'test-token');
     expect(data.invite.userId).toBe(7);
     expect(data.invite.inviteCode).toBe('ABCD1234');
   });
@@ -78,7 +78,7 @@ describe('invite code routes', () => {
 
     expect(response.status).toBe(201);
     expect(mockGetCurrentUserByToken).toHaveBeenCalledWith('test-token');
-    expect(mockBindInviteCodeForUser).toHaveBeenCalledWith(7, 'zxcv7788');
+    expect(mockBindInviteCodeForUser).toHaveBeenCalledWith(7, 'zxcv7788', 'test-token');
     expect(data.binding.inviterUserId).toBe(99);
     expect(data.binding.inviterCode).toBe('ZXCV7788');
   });

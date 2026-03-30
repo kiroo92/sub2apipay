@@ -302,3 +302,74 @@ export async function addBalance(userId: number, amount: number, notes: string, 
     throw new Error(`Add balance failed (${response.status}): ${JSON.stringify(errorData)}`);
   }
 }
+
+
+export interface Sub2ApiInviteInfo {
+  invite_code: string | null;
+  invite_link?: string;
+  binding: {
+    inviter_user_id: number;
+    inviter_code: string;
+    bound_at: string;
+  } | null;
+  can_bind: boolean;
+}
+
+export async function getInviteInfoByToken(token: string): Promise<Sub2ApiInviteInfo> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/user/invite`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get invite info: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.data as Sub2ApiInviteInfo;
+}
+
+export async function bindInviteCodeByToken(token: string, referralCode: string): Promise<{
+  binding: {
+    inviter_user_id: number;
+    inviter_code: string;
+    bound_at: string;
+  };
+}> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/user/invite/bind`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ referral_code: referralCode }),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      typeof payload?.message === 'string'
+        ? payload.message
+        : typeof payload?.error === 'string'
+          ? payload.error
+          : `Failed to bind invite code: ${response.status}`;
+    const code = typeof payload?.reason === 'string' ? payload.reason : undefined;
+    const err = new Error(message) as Error & { code?: string; status?: number };
+    err.code = code;
+    err.status = response.status;
+    throw err;
+  }
+
+  return payload as {
+    binding: {
+      inviter_user_id: number;
+      inviter_code: string;
+      bound_at: string;
+    };
+  };
+}

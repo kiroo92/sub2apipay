@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const user = await getCurrentUserByToken(token);
-    const invite = await getInviteInfoForUser(user.id);
+    const invite = await getInviteInfoForUser(user.id, token);
 
     return NextResponse.json({
       invite: {

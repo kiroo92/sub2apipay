@@ -1,12 +1,8 @@
-import { randomBytes } from 'crypto';
 import { InviteRewardRole, InviteRewardStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { addBalance } from '@/lib/sub2api/client';
+import { addBalance, bindInviteCodeByToken, getInviteInfoByToken } from '@/lib/sub2api/client';
 import { getSystemConfigs } from '@/lib/system-config';
 
-const INVITE_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const INVITE_CODE_LENGTH = 8;
-const MAX_GENERATE_CODE_ATTEMPTS = 12;
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on']);
 
 export interface InviteFeatureFlags {
@@ -41,22 +37,6 @@ export class InviteError extends Error {
 function isEnabled(value?: string): boolean {
   if (!value) return false;
   return ENABLED_VALUES.has(value.trim().toLowerCase());
-}
-
-function normalizeInviteCode(code: string): string {
-  return code
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '');
-}
-
-function generateInviteCodeCandidate(): string {
-  const bytes = randomBytes(INVITE_CODE_LENGTH);
-  let code = '';
-  for (let i = 0; i < INVITE_CODE_LENGTH; i += 1) {
-    code += INVITE_CODE_ALPHABET[bytes[i] % INVITE_CODE_ALPHABET.length];
-  }
-  return code;
 }
 
 function isUniqueConstraintError(error: unknown, target?: string | string[]): boolean {
@@ -106,130 +86,93 @@ export async function getInviteFeatureFlags(): Promise<InviteFeatureFlags> {
   };
 }
 
-async function createInviteCode(tx: Prisma.TransactionClient, userId: number) {
-  for (let attempt = 0; attempt < MAX_GENERATE_CODE_ATTEMPTS; attempt += 1) {
-    try {
-      return await tx.inviteCode.create({
-        data: {
-          userId,
-          code: generateInviteCodeCandidate(),
-        },
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error, ['userId', 'user_id'])) {
-        return tx.inviteCode.findUniqueOrThrow({ where: { userId } });
-      }
-      if (isUniqueConstraintError(error, 'code')) {
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw new InviteError('INVITE_CODE_GENERATION_FAILED', '邀请码生成失败，请稍后重试', 500);
-}
-
-export async function ensureInviteCodeForUser(userId: number) {
-  const existing = await prisma.inviteCode.findUnique({ where: { userId } });
-  if (existing) return existing;
-
-  return prisma.$transaction((tx) => createInviteCode(tx, userId));
-}
-
-export async function getInviteInfoForUser(userId: number): Promise<InviteInfo> {
-  const [flags, existingCode, binding] = await Promise.all([
+export async function getInviteInfoForUser(userId: number, token: string): Promise<InviteInfo> {
+  const [flags, upstreamInvite] = await Promise.all([
     getInviteFeatureFlags(),
-    prisma.inviteCode.findUnique({ where: { userId } }),
-    prisma.inviteBinding.findUnique({
-      where: { inviteeUserId: userId },
-      include: {
-        inviteCode: {
-          select: {
-            code: true,
-          },
-        },
-      },
-    }),
+    getInviteInfoByToken(token),
   ]);
-
-  const inviteCode = existingCode ?? (flags.programEnabled ? await ensureInviteCodeForUser(userId) : null);
 
   return {
     flags,
-    inviteCode: inviteCode?.code ?? null,
-    binding: binding
+    inviteCode: upstreamInvite.invite_code ?? null,
+    binding: upstreamInvite.binding
       ? {
-          inviterUserId: binding.inviterUserId,
-          inviterCode: binding.inviteCode.code,
-          boundAt: binding.createdAt,
+          inviterUserId: upstreamInvite.binding.inviter_user_id,
+          inviterCode: upstreamInvite.binding.inviter_code,
+          boundAt: new Date(upstreamInvite.binding.bound_at),
         }
       : null,
-    canBind: flags.bindingEnabled && !binding,
+    canBind: flags.bindingEnabled && upstreamInvite.can_bind,
   };
 }
 
-export async function bindInviteCodeForUser(userId: number, rawInviteCode: string) {
+export async function bindInviteCodeForUser(userId: number, rawInviteCode: string, token: string) {
   const flags = await getInviteFeatureFlags();
   if (!flags.programEnabled || !flags.bindingEnabled) {
     throw new InviteError('INVITE_BINDING_DISABLED', '邀请码绑定暂未开启', 403);
   }
 
-  const inviteCode = normalizeInviteCode(rawInviteCode);
+  const inviteCode = rawInviteCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (inviteCode.length < 4) {
     throw new InviteError('INVALID_INVITE_CODE', '邀请码格式不正确', 400);
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
-      const existingBinding = await tx.inviteBinding.findUnique({
-        where: { inviteeUserId: userId },
-        include: {
-          inviteCode: {
-            select: {
-              code: true,
-            },
-          },
-        },
-      });
-      if (existingBinding) {
-        throw new InviteError('ALREADY_BOUND', '当前账号已绑定邀请人，不能重复绑定', 409);
-      }
+    const upstream = await bindInviteCodeByToken(token, inviteCode);
+    const binding = upstream.binding;
 
-      const inviterCode = await tx.inviteCode.findUnique({ where: { code: inviteCode } });
-      if (!inviterCode || !inviterCode.active) {
-        throw new InviteError('INVITE_CODE_NOT_FOUND', '邀请码不存在或已失效', 404);
-      }
-      if (inviterCode.userId === userId) {
-        throw new InviteError('SELF_BIND_FORBIDDEN', '不能绑定自己的邀请码', 400);
-      }
-
-      const reverseBinding = await tx.inviteBinding.findUnique({
-        where: { inviteeUserId: inviterCode.userId },
-        select: { inviterUserId: true },
-      });
-      if (reverseBinding?.inviterUserId === userId) {
-        throw new InviteError('MUTUAL_BIND_FORBIDDEN', '不能与已邀请你的用户互相绑定', 409);
-      }
-
-      return tx.inviteBinding.create({
-        data: {
-          inviterUserId: inviterCode.userId,
-          inviteeUserId: userId,
-          inviteCodeId: inviterCode.id,
-        },
-        include: {
-          inviteCode: {
-            select: {
-              code: true,
-            },
-          },
-        },
-      });
+    const inviteCodeRecord = await prisma.inviteCode.upsert({
+      where: { code: binding.inviter_code },
+      update: { userId: binding.inviter_user_id, active: true },
+      create: {
+        userId: binding.inviter_user_id,
+        code: binding.inviter_code,
+        active: true,
+      },
     });
+
+    const mirroredBinding = await prisma.inviteBinding.upsert({
+      where: { inviteeUserId: userId },
+      update: {
+        inviterUserId: binding.inviter_user_id,
+        inviteCodeId: inviteCodeRecord.id,
+      },
+      create: {
+        inviterUserId: binding.inviter_user_id,
+        inviteeUserId: userId,
+        inviteCodeId: inviteCodeRecord.id,
+      },
+      include: {
+        inviteCode: {
+          select: { code: true },
+        },
+      },
+    });
+
+    return {
+      inviterUserId: mirroredBinding.inviterUserId,
+      inviteCode: { code: mirroredBinding.inviteCode.code },
+      createdAt: new Date(binding.bound_at),
+    };
   } catch (error) {
     if (error instanceof InviteError) throw error;
-    if (isUniqueConstraintError(error, ['inviteeUserId', 'invitee_user_id'])) {
-      throw new InviteError('ALREADY_BOUND', '当前账号已绑定邀请人，不能重复绑定', 409);
+    if (error instanceof Error) {
+      const code = (error as Error & { code?: string; status?: number }).code;
+      const status = (error as Error & { status?: number }).status ?? 500;
+      switch (code) {
+        case 'REFERRAL_ALREADY_BOUND':
+          throw new InviteError('ALREADY_BOUND', '当前账号已绑定邀请人，不能重复绑定', 409);
+        case 'REFERRAL_CODE_INVALID':
+          throw new InviteError('INVITE_CODE_NOT_FOUND', '邀请码不存在或已失效', 404);
+        case 'REFERRAL_CODE_INACTIVE':
+          throw new InviteError('INVITE_CODE_NOT_FOUND', '邀请码不存在或已失效', 404);
+        case 'REFERRAL_SELF_BIND_FORBIDDEN':
+          throw new InviteError('SELF_BIND_FORBIDDEN', '不能绑定自己的邀请码', 400);
+        case 'REFERRAL_MUTUAL_BIND_FORBIDDEN':
+          throw new InviteError('MUTUAL_BIND_FORBIDDEN', '不能与已邀请你的用户互相绑定', 409);
+        default:
+          throw new InviteError(code || 'INVITE_BIND_FAILED', error.message || '绑定邀请码失败', status);
+      }
     }
     throw error;
   }

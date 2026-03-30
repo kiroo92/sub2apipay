@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await getCurrentUserByToken(parsed.data.token.trim());
-    const binding = await bindInviteCodeForUser(user.id, parsed.data.invite_code);
+    const binding = await bindInviteCodeForUser(user.id, parsed.data.invite_code, parsed.data.token.trim());
 
     return NextResponse.json(
       {
