@@ -1007,53 +1007,27 @@ function PayContent() {
                   {renderOrdersSection('mt-6')}
                 </>
               ) : (
-                <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.8fr)]">
-                  <div className="min-w-0">
-                    <PaymentForm
-                      userId={resolvedUserId ?? 0}
-                      userName={userInfo?.username}
-                      userBalance={userInfo?.balance}
-                      enabledPaymentTypes={config.enabledPaymentTypes}
-                      methodLimits={config.methodLimits}
-                      minBalanceAmount={config.minBalanceAmount}
-                      maxBalanceAmount={config.maxBalanceAmount}
-                      balanceExchangeRate={config.balanceExchangeRate}
-                      onSubmit={handleSubmit}
-                      loading={loading}
-                      dark={isDark}
-                      pendingBlocked={pendingBlocked}
-                      pendingCount={pendingCount}
-                      locale={locale}
-                    />
-                  </div>
-                  <div className="space-y-4">
-                    <div
-                      className={[
-                        'rounded-2xl border p-4',
-                        isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50',
-                      ].join(' ')}
-                    >
-                      <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-                        {pickLocaleText(locale, '支付说明', 'Payment Notes')}
-                      </div>
-                      <ul
-                        className={['mt-2 space-y-1 text-sm', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}
-                      >
-                        <li>
-                          {pickLocaleText(locale, '订单完成后会自动到账', 'Balance will be credited automatically')}
-                        </li>
-                        <li>
-                          {pickLocaleText(locale, '如需历史记录请查看「我的订单」', 'Check "My Orders" for history')}
-                        </li>
-                        {config.maxDailyAmount > 0 && (
-                          <li>
-                            {pickLocaleText(locale, '每日最大充值', 'Max daily recharge')} ¥
-                            {config.maxDailyAmount.toFixed(2)}
-                          </li>
-                        )}
-                      </ul>
+                <>
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.8fr)]">
+                    <div className="min-w-0">
+                      <PaymentForm
+                        userId={resolvedUserId ?? 0}
+                        userName={userInfo?.username}
+                        userBalance={userInfo?.balance}
+                        enabledPaymentTypes={config.enabledPaymentTypes}
+                        methodLimits={config.methodLimits}
+                        minBalanceAmount={config.minBalanceAmount}
+                        maxBalanceAmount={config.maxBalanceAmount}
+                        balanceExchangeRate={config.balanceExchangeRate}
+                        onSubmit={handleSubmit}
+                        loading={loading}
+                        dark={isDark}
+                        pendingBlocked={pendingBlocked}
+                        pendingCount={pendingCount}
+                        locale={locale}
+                      />
                     </div>
-                    {hasHelpContent && (
+                    <div className="space-y-4">
                       <div
                         className={[
                           'rounded-2xl border p-4',
@@ -1061,32 +1035,61 @@ function PayContent() {
                         ].join(' ')}
                       >
                         <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-                          {pickLocaleText(locale, '帮助', 'Support')}
+                          {pickLocaleText(locale, '支付说明', 'Payment Notes')}
                         </div>
-                        {helpImageUrl && (
-                          <img
-                            src={helpImageUrl}
-                            alt="help"
-                            onClick={() => setHelpImageOpen(true)}
-                            className={`mt-3 max-h-40 w-full cursor-zoom-in rounded-lg object-contain p-2 ${isDark ? 'bg-slate-700/50' : 'bg-white/70'}`}
-                          />
-                        )}
-                        {helpText && (
-                          <div
-                            className={[
-                              'mt-3 space-y-1 text-sm leading-6',
-                              isDark ? 'text-slate-300' : 'text-slate-600',
-                            ].join(' ')}
-                          >
-                            {helpText.split('\n').map((line, i) => (
-                              <p key={i}>{line}</p>
-                            ))}
-                          </div>
-                        )}
+                        <ul
+                          className={['mt-2 space-y-1 text-sm', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}
+                        >
+                          <li>
+                            {pickLocaleText(locale, '订单完成后会自动到账', 'Balance will be credited automatically')}
+                          </li>
+                          <li>
+                            {pickLocaleText(locale, '如需历史记录请查看「我的订单」', 'Check "My Orders" for history')}
+                          </li>
+                          {config.maxDailyAmount > 0 && (
+                            <li>
+                              {pickLocaleText(locale, '每日最大充值', 'Max daily recharge')} ¥
+                              {config.maxDailyAmount.toFixed(2)}
+                            </li>
+                          )}
+                        </ul>
                       </div>
-                    )}
+                      {hasHelpContent && (
+                        <div
+                          className={[
+                            'rounded-2xl border p-4',
+                            isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50',
+                          ].join(' ')}
+                        >
+                          <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                            {pickLocaleText(locale, '帮助', 'Support')}
+                          </div>
+                          {helpImageUrl && (
+                            <img
+                              src={helpImageUrl}
+                              alt="help"
+                              onClick={() => setHelpImageOpen(true)}
+                              className={`mt-3 max-h-40 w-full cursor-zoom-in rounded-lg object-contain p-2 ${isDark ? 'bg-slate-700/50' : 'bg-white/70'}`}
+                            />
+                          )}
+                          {helpText && (
+                            <div
+                              className={[
+                                'mt-3 space-y-1 text-sm leading-6',
+                                isDark ? 'text-slate-300' : 'text-slate-600',
+                              ].join(' ')}
+                            >
+                              {helpText.split('\n').map((line, i) => (
+                                <p key={i}>{line}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                  {renderOrdersSection('mt-6')}
+                </>
               )}
             </>
           )}
