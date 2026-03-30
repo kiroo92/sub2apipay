@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetSystemConfigs = vi.fn();
-const mockFindUniqueInviteCode = vi.fn();
-const mockUpsertInviteCode = vi.fn();
-const mockUpsertInviteBinding = vi.fn();
-const mockFindUniqueInviteBinding = vi.fn();
-const mockCreateInviteBinding = vi.fn();
-const mockTransaction = vi.fn();
+const mockGetInviteBindingsByUserId = vi.fn();
 const mockBindInviteCodeByToken = vi.fn();
 
 vi.mock('@/lib/system-config', () => ({
@@ -16,20 +11,21 @@ vi.mock('@/lib/system-config', () => ({
 vi.mock('@/lib/sub2api/client', () => ({
   addBalance: vi.fn(),
   bindInviteCodeByToken: (...args: unknown[]) => mockBindInviteCodeByToken(...args),
+  getInviteBindingsByUserId: (...args: unknown[]) => mockGetInviteBindingsByUserId(...args),
   getInviteInfoByToken: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   prisma: {
     inviteCode: {
-      findUnique: (...args: unknown[]) => mockFindUniqueInviteCode(...args),
-      upsert: (...args: unknown[]) => mockUpsertInviteCode(...args),
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
     },
     inviteBinding: {
-      findUnique: (...args: unknown[]) => mockFindUniqueInviteBinding(...args),
-      upsert: (...args: unknown[]) => mockUpsertInviteBinding(...args),
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
+    $transaction: vi.fn(),
   },
 }));
 
@@ -44,13 +40,8 @@ describe('bindInviteCodeForUser', () => {
       INVITE_REWARD_ENABLED: 'false',
     });
 
-    mockFindUniqueInviteBinding.mockReset();
-    mockFindUniqueInviteCode.mockReset();
-    mockCreateInviteBinding.mockReset();
-    mockTransaction.mockReset();
-    mockFindUniqueInviteCode.mockResolvedValue(null);
-    mockUpsertInviteCode.mockResolvedValue({ id: 'code-1', userId: 99, code: 'ZXCV7788', active: true });
-    mockUpsertInviteBinding.mockResolvedValue({ inviterUserId: 99, inviteCode: { code: 'ZXCV7788' } });
+    mockGetInviteBindingsByUserId.mockReset();
+    mockBindInviteCodeByToken.mockReset();
     mockBindInviteCodeByToken.mockResolvedValue({
       binding: {
         inviter_user_id: 99,
@@ -60,14 +51,11 @@ describe('bindInviteCodeForUser', () => {
     });
   });
 
-  it('creates mirrored binding after upstream bind succeeds', async () => {
-    mockFindUniqueInviteCode.mockResolvedValue(null);
-    mockCreateInviteBinding.mockResolvedValue({});
-    mockTransaction.mockResolvedValue(undefined);
-
+  it('returns upstream binding after bind succeeds', async () => {
     const result = await bindInviteCodeForUser(7, 'zxcv7788', 'test-token');
 
     expect(result.inviterUserId).toBe(99);
+    expect(result.inviteCode.code).toBe('ZXCV7788');
     expect(mockBindInviteCodeByToken).toHaveBeenCalledWith('test-token', 'ZXCV7788');
   });
 

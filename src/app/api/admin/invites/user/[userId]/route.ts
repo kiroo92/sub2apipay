@@ -2,7 +2,7 @@ import { InviteRewardStatus, Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
 import { prisma } from '@/lib/db';
-import { getUser } from '@/lib/sub2api/client';
+import { getUser, getInviteBindingsByUserId } from '@/lib/sub2api/client';
 
 function toNumber(value: Prisma.Decimal | null | undefined): number {
   return value ? Number(value.toString()) : 0;
@@ -23,25 +23,22 @@ export async function GET(
   const involvementWhere: Prisma.InviteRewardGrantWhereInput = {
     OR: [
       { recipientUserId: userId },
-      { binding: { inviterUserId: userId } },
-      { binding: { inviteeUserId: userId } },
+      { inviterUserId: userId },
+      { inviteeUserId: userId },
       { order: { userId } },
     ],
   };
 
   const [
     user,
-    asInviterCount,
-    asInviteeCount,
+    upstreamBindings,
     receivedSummary,
     generatedForInviteesSummary,
     inviterSelfRewardSummary,
-    recentBindings,
     recentRewards,
   ] = await Promise.all([
     getUser(userId).catch(() => null),
-    prisma.inviteBinding.count({ where: { inviterUserId: userId } }),
-    prisma.inviteBinding.count({ where: { inviteeUserId: userId } }),
+    getInviteBindingsByUserId(userId).catch(() => []),
     prisma.inviteRewardGrant.aggregate({
       where: { recipientUserId: userId, status: InviteRewardStatus.COMPLETED },
       _count: { _all: true },
@@ -49,7 +46,7 @@ export async function GET(
     }),
     prisma.inviteRewardGrant.aggregate({
       where: {
-        binding: { inviterUserId: userId },
+        inviterUserId: userId,
         role: 'INVITEE',
         status: InviteRewardStatus.COMPLETED,
       },
@@ -58,32 +55,13 @@ export async function GET(
     }),
     prisma.inviteRewardGrant.aggregate({
       where: {
-        binding: { inviterUserId: userId },
+        inviterUserId: userId,
         role: 'INVITER',
         recipientUserId: userId,
         status: InviteRewardStatus.COMPLETED,
       },
       _count: { _all: true },
       _sum: { amount: true },
-    }),
-    prisma.inviteBinding.findMany({
-      where: {
-        OR: [{ inviterUserId: userId }, { inviteeUserId: userId }],
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      select: {
-        id: true,
-        inviterUserId: true,
-        inviteeUserId: true,
-        createdAt: true,
-        inviteCode: {
-          select: {
-            code: true,
-            userId: true,
-          },
-        },
-      },
     }),
     prisma.inviteRewardGrant.findMany({
       where: involvementWhere,
@@ -92,6 +70,9 @@ export async function GET(
       select: {
         id: true,
         orderId: true,
+        inviterUserId: true,
+        inviteeUserId: true,
+        inviteCode: true,
         recipientUserId: true,
         role: true,
         amount: true,
@@ -112,20 +93,17 @@ export async function GET(
             completedAt: true,
           },
         },
-        binding: {
-          select: {
-            inviterUserId: true,
-            inviteeUserId: true,
-            inviteCode: {
-              select: {
-                code: true,
-              },
-            },
-          },
-        },
       },
     }),
   ]);
+
+  const recentBindings = upstreamBindings
+    .filter((binding) => binding.inviter_user_id === userId || binding.invitee_user_id === userId)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 100);
+
+  const asInviterCount = upstreamBindings.filter((binding) => binding.inviter_user_id === userId).length;
+  const asInviteeCount = upstreamBindings.filter((binding) => binding.invitee_user_id === userId).length;
 
   return NextResponse.json({
     userId,
@@ -151,12 +129,12 @@ export async function GET(
       inviterSelfRewardAmount: toNumber(inviterSelfRewardSummary._sum.amount),
     },
     bindings: recentBindings.map((binding) => ({
-      id: binding.id,
-      inviterUserId: binding.inviterUserId,
-      inviteeUserId: binding.inviteeUserId,
-      inviteCode: binding.inviteCode.code,
-      inviteCodeOwnerUserId: binding.inviteCode.userId,
-      createdAt: binding.createdAt,
+      id: String(binding.id ?? `${binding.inviter_user_id}-${binding.invitee_user_id}`),
+      inviterUserId: binding.inviter_user_id,
+      inviteeUserId: binding.invitee_user_id,
+      inviteCode: binding.invite_code,
+      inviteCodeOwnerUserId: binding.invite_code_owner_user_id ?? null,
+      createdAt: binding.created_at,
     })),
     rewards: recentRewards.map((reward) => ({
       id: reward.id,
@@ -180,9 +158,9 @@ export async function GET(
         completedAt: reward.order.completedAt,
       },
       binding: {
-        inviterUserId: reward.binding.inviterUserId,
-        inviteeUserId: reward.binding.inviteeUserId,
-        inviteCode: reward.binding.inviteCode.code,
+        inviterUserId: reward.inviterUserId,
+        inviteeUserId: reward.inviteeUserId,
+        inviteCode: reward.inviteCode,
       },
     })),
   });

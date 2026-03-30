@@ -373,3 +373,60 @@ export async function bindInviteCodeByToken(token: string, referralCode: string)
     };
   };
 }
+
+
+export interface Sub2ApiInviteBindingRecord {
+  id?: number | string;
+  inviter_user_id: number;
+  invitee_user_id: number;
+  invite_code: string;
+  created_at: string;
+  invite_code_owner_user_id?: number;
+}
+
+export async function getInviteBindingsByUserId(userId: number): Promise<Sub2ApiInviteBindingRecord[]> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/invites/users/${userId}/bindings`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get invite bindings by user: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return (data.data ?? []) as Sub2ApiInviteBindingRecord[];
+}
+
+export async function listInviteBindings(params?: {
+  user_id?: number;
+  invite_code?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<{ items: Sub2ApiInviteBindingRecord[]; total: number; page: number; page_size: number }> {
+  const env = getEnv();
+  const qs = new URLSearchParams();
+  if (params?.user_id != null) qs.set('user_id', String(params.user_id));
+  if (params?.invite_code) qs.set('invite_code', params.invite_code);
+  if (params?.page != null) qs.set('page', String(params.page));
+  if (params?.page_size != null) qs.set('page_size', String(params.page_size));
+
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/invites/bindings?${qs.toString()}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to list invite bindings: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const paginated = data.data ?? {};
+  return {
+    items: (paginated.items ?? []) as Sub2ApiInviteBindingRecord[],
+    total: paginated.total ?? 0,
+    page: paginated.page ?? 1,
+    page_size: paginated.page_size ?? 50,
+  };
+}

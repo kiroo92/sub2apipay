@@ -166,8 +166,6 @@ model InviteBinding {
   inviteCode    InviteCode @relation(fields: [inviteCodeId], references: [id])
   createdAt     DateTime   @default(now()) @map("created_at")
 
-  rewardGrants InviteRewardGrant[]
-
   @@index([inviterUserId])
   @@index([inviteCodeId])
   @@map("invite_bindings")
@@ -177,8 +175,10 @@ model InviteRewardGrant {
   id              String             @id @default(cuid())
   orderId         String             @map("order_id")
   order           Order              @relation(fields: [orderId], references: [id])
-  bindingId       String             @map("binding_id")
-  binding         InviteBinding      @relation(fields: [bindingId], references: [id])
+  inviterUserId   Int                @map("inviter_user_id")
+  inviteeUserId   Int                @map("invitee_user_id")
+  inviteCode      String             @map("invite_code")
+  boundAt         DateTime           @map("bound_at")
   recipientUserId Int                @map("recipient_user_id")
   role            InviteRewardRole
   amount          Decimal            @db.Decimal(10, 2)
@@ -191,7 +191,9 @@ model InviteRewardGrant {
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
   @@unique([orderId, role])
-  @@index([bindingId])
+  @@index([inviterUserId])
+  @@index([inviteeUserId])
+  @@index([inviteCode])
   @@index([recipientUserId])
   @@index([status])
   @@map("invite_reward_grants")

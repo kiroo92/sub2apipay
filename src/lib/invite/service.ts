@@ -1,6 +1,6 @@
 import { InviteRewardRole, InviteRewardStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { addBalance, bindInviteCodeByToken, getInviteInfoByToken } from '@/lib/sub2api/client';
+import { addBalance, bindInviteCodeByToken, getInviteBindingsByUserId, getInviteInfoByToken } from '@/lib/sub2api/client';
 import { getSystemConfigs } from '@/lib/system-config';
 
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on']);
@@ -37,22 +37,6 @@ export class InviteError extends Error {
 function isEnabled(value?: string): boolean {
   if (!value) return false;
   return ENABLED_VALUES.has(value.trim().toLowerCase());
-}
-
-function isUniqueConstraintError(error: unknown, target?: string | string[]): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
-    return false;
-  }
-
-  if (!target) return true;
-
-  const candidates = Array.isArray(target) ? target : [target];
-  const metaTarget = error.meta?.target;
-  if (Array.isArray(metaTarget)) {
-    return candidates.some((item) => metaTarget.includes(item));
-  }
-
-  return typeof metaTarget === 'string' && candidates.some((item) => metaTarget.includes(item));
 }
 
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number {
@@ -120,38 +104,9 @@ export async function bindInviteCodeForUser(userId: number, rawInviteCode: strin
   try {
     const upstream = await bindInviteCodeByToken(token, inviteCode);
     const binding = upstream.binding;
-
-    const inviteCodeRecord = await prisma.inviteCode.upsert({
-      where: { code: binding.inviter_code },
-      update: { userId: binding.inviter_user_id, active: true },
-      create: {
-        userId: binding.inviter_user_id,
-        code: binding.inviter_code,
-        active: true,
-      },
-    });
-
-    const mirroredBinding = await prisma.inviteBinding.upsert({
-      where: { inviteeUserId: userId },
-      update: {
-        inviterUserId: binding.inviter_user_id,
-        inviteCodeId: inviteCodeRecord.id,
-      },
-      create: {
-        inviterUserId: binding.inviter_user_id,
-        inviteeUserId: userId,
-        inviteCodeId: inviteCodeRecord.id,
-      },
-      include: {
-        inviteCode: {
-          select: { code: true },
-        },
-      },
-    });
-
     return {
-      inviterUserId: mirroredBinding.inviterUserId,
-      inviteCode: { code: mirroredBinding.inviteCode.code },
+      inviterUserId: binding.inviter_user_id,
+      inviteCode: { code: binding.inviter_code },
       createdAt: new Date(binding.bound_at),
     };
   } catch (error) {
@@ -212,11 +167,13 @@ async function prepareInviteRewardGrants(orderId: string) {
       };
     }
 
-    const binding = await tx.inviteBinding.findUnique({ where: { inviteeUserId: order.userId } });
+    const userBindings = await getInviteBindingsByUserId(order.userId);
+    const binding = userBindings.find((item) => item.invitee_user_id === order.userId) ?? null;
     if (!binding) {
       return { reason: 'user_not_bound', grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>> };
     }
-    if (order.paidAt && binding.createdAt > order.paidAt) {
+    const boundAt = new Date(binding.created_at);
+    if (order.paidAt && boundAt > order.paidAt) {
       return {
         reason: 'binding_after_payment',
         grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>>,
@@ -268,12 +225,12 @@ async function prepareInviteRewardGrants(orderId: string) {
     const rewardSpecs = [
       {
         role: InviteRewardRole.INVITER,
-        recipientUserId: binding.inviterUserId,
+        recipientUserId: binding.inviter_user_id,
         amount: inviterAmount,
       },
       {
         role: InviteRewardRole.INVITEE,
-        recipientUserId: binding.inviteeUserId,
+        recipientUserId: binding.invitee_user_id,
         amount: inviteeAmount,
       },
     ].filter((item) => item.amount > 0);
@@ -294,7 +251,10 @@ async function prepareInviteRewardGrants(orderId: string) {
       await tx.inviteRewardGrant.create({
         data: {
           orderId,
-          bindingId: binding.id,
+          inviterUserId: binding.inviter_user_id,
+          inviteeUserId: binding.invitee_user_id,
+          inviteCode: binding.invite_code,
+          boundAt,
           recipientUserId: spec.recipientUserId,
           role: spec.role,
           amount: new Prisma.Decimal(spec.amount.toFixed(2)),
