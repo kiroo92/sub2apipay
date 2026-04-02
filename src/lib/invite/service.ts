@@ -1,6 +1,6 @@
 import { InviteRewardRole, InviteRewardStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { addBalance, bindInviteCodeByToken, getInviteBindingsByUserId, getInviteInfoByToken } from '@/lib/sub2api/client';
+import { addBalance, bindInviteCodeByToken, getInviteInfoByToken } from '@/lib/sub2api/client';
 import { getSystemConfigs } from '@/lib/system-config';
 
 const ENABLED_VALUES = new Set(['1', 'true', 'yes', 'on']);
@@ -167,12 +167,22 @@ async function prepareInviteRewardGrants(orderId: string) {
       };
     }
 
-    const userBindings = await getInviteBindingsByUserId(order.userId);
-    const binding = userBindings.find((item) => item.invitee_user_id === order.userId) ?? null;
+    const binding = await tx.inviteBinding.findUnique({
+      where: { inviteeUserId: order.userId },
+      include: {
+        inviteCode: {
+          select: {
+            code: true,
+          },
+        },
+      },
+    });
+
     if (!binding) {
       return { reason: 'user_not_bound', grants: [] as Awaited<ReturnType<typeof prisma.inviteRewardGrant.findMany>> };
     }
-    const boundAt = new Date(binding.created_at);
+
+    const boundAt = binding.createdAt;
     if (order.paidAt && boundAt > order.paidAt) {
       return {
         reason: 'binding_after_payment',
@@ -225,12 +235,12 @@ async function prepareInviteRewardGrants(orderId: string) {
     const rewardSpecs = [
       {
         role: InviteRewardRole.INVITER,
-        recipientUserId: binding.inviter_user_id,
+        recipientUserId: binding.inviterUserId,
         amount: inviterAmount,
       },
       {
         role: InviteRewardRole.INVITEE,
-        recipientUserId: binding.invitee_user_id,
+        recipientUserId: binding.inviteeUserId,
         amount: inviteeAmount,
       },
     ].filter((item) => item.amount > 0);
@@ -251,9 +261,9 @@ async function prepareInviteRewardGrants(orderId: string) {
       await tx.inviteRewardGrant.create({
         data: {
           orderId,
-          inviterUserId: binding.inviter_user_id,
-          inviteeUserId: binding.invitee_user_id,
-          inviteCode: binding.invite_code,
+          inviterUserId: binding.inviterUserId,
+          inviteeUserId: binding.inviteeUserId,
+          inviteCode: binding.inviteCode.code,
           boundAt,
           recipientUserId: spec.recipientUserId,
           role: spec.role,
