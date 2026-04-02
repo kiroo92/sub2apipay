@@ -2,7 +2,6 @@ import { InviteRewardStatus, Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
 import { prisma } from '@/lib/db';
-import { listInviteBindings } from '@/lib/sub2api/client';
 
 const ORDER_TYPES = new Set(['balance', 'subscription']);
 
@@ -23,6 +22,21 @@ export async function GET(request: NextRequest) {
   const hasUserId = Number.isInteger(userId) && userId > 0;
   const orderType = ORDER_TYPES.has(orderTypeRaw) ? orderTypeRaw : '';
   const rewardStatus = rewardStatusRaw in InviteRewardStatus ? (rewardStatusRaw as InviteRewardStatus) : undefined;
+
+  const bindingWhere: Prisma.InviteBindingWhereInput = {};
+  if (hasUserId) {
+    bindingWhere.OR = [{ inviterUserId: userId }, { inviteeUserId: userId }];
+  }
+  if (inviteCode) {
+    bindingWhere.inviteCode = {
+      is: {
+        code: {
+          contains: inviteCode,
+          mode: 'insensitive',
+        },
+      },
+    };
+  }
 
   const rewardWhere: Prisma.InviteRewardGrantWhereInput = {};
   if (hasUserId) {
@@ -46,13 +60,23 @@ export async function GET(request: NextRequest) {
     rewardWhere.status = rewardStatus;
   }
 
-  const [bindingPage, rewardSummary, completedRewardSummary, failedRewardCount, pendingRewardCount, rewards] =
+  const [bindingCount, bindings, rewardSummary, completedRewardSummary, failedRewardCount, pendingRewardCount, rewards] =
     await Promise.all([
-      listInviteBindings({
-        user_id: hasUserId ? userId : undefined,
-        invite_code: inviteCode || undefined,
-        page: 1,
-        page_size: 100,
+      prisma.inviteBinding.count({
+        where: bindingWhere,
+      }),
+      prisma.inviteBinding.findMany({
+        where: bindingWhere,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          inviteCode: {
+            select: {
+              code: true,
+              userId: true,
+            },
+          },
+        },
       }),
       prisma.inviteRewardGrant.aggregate({
         where: rewardWhere,
@@ -112,7 +136,7 @@ export async function GET(request: NextRequest) {
       rewardStatus: rewardStatus ?? null,
     },
     summary: {
-      bindingCount: bindingPage.total,
+      bindingCount,
       rewardCount: rewardSummary._count._all,
       rewardAmount: toNumber(rewardSummary._sum.amount),
       completedRewardCount: completedRewardSummary._count._all,
@@ -120,13 +144,13 @@ export async function GET(request: NextRequest) {
       failedRewardCount,
       pendingRewardCount,
     },
-    bindings: bindingPage.items.map((binding) => ({
-      id: String(binding.id ?? `${binding.inviter_user_id}-${binding.invitee_user_id}`),
-      inviterUserId: binding.inviter_user_id,
-      inviteeUserId: binding.invitee_user_id,
-      inviteCode: binding.invite_code,
-      inviteCodeOwnerUserId: binding.invite_code_owner_user_id ?? null,
-      createdAt: binding.created_at,
+    bindings: bindings.map((binding) => ({
+      id: binding.id,
+      inviterUserId: binding.inviterUserId,
+      inviteeUserId: binding.inviteeUserId,
+      inviteCode: binding.inviteCode.code,
+      inviteCodeOwnerUserId: binding.inviteCode.userId,
+      createdAt: binding.createdAt,
     })),
     rewards: rewards.map((reward) => ({
       id: reward.id,
