@@ -121,8 +121,8 @@ describe('duanwu activity service', () => {
     mockRecordFindUnique.mockResolvedValueOnce(null);
     mockRecordCreate.mockResolvedValue({
       id: 'draw-1',
-      prizeKey: 'third',
-      prizeName: '三等奖',
+      prizeKey: 'fourth',
+      prizeName: '四等奖',
       prizeAmount: 6.66,
       issueStatus: 'PENDING',
       issuedAt: null,
@@ -131,8 +131,8 @@ describe('duanwu activity service', () => {
     mockAddBalance.mockResolvedValue(undefined);
     mockRecordUpdate.mockResolvedValue({
       id: 'draw-1',
-      prizeKey: 'third',
-      prizeName: '三等奖',
+      prizeKey: 'fourth',
+      prizeName: '四等奖',
       prizeAmount: 6.66,
       issueStatus: 'ISSUED',
       issuedAt: new Date('2026-06-16T00:00:01Z'),
@@ -143,7 +143,7 @@ describe('duanwu activity service', () => {
 
     expect(mockRecordCreate).toHaveBeenCalledTimes(1);
     expect(mockAddBalance).toHaveBeenCalledTimes(1);
-    expect(result.prize.name).toBe('三等奖');
+    expect(result.prize.name).toBe('四等奖');
     expect(result.alreadyDrawn).toBe(false);
     randomSpy.mockRestore();
   });
@@ -217,6 +217,45 @@ describe('duanwu activity service', () => {
     randomSpy.mockRestore();
   });
 
+  it('guarantees at least 16.66 prize when june total is 100 or more', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.2);
+    mockOrders([
+      {
+        id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
+        amount: 120,
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-05T00:01:00.000Z',
+      },
+    ]);
+    mockRecordFindUnique.mockResolvedValueOnce(null);
+    mockRecordCreate.mockResolvedValue({
+      id: 'draw-2b',
+      prizeKey: 'fourth',
+      prizeName: '四等奖',
+      prizeAmount: 16.66,
+      issueStatus: 'PENDING',
+      issuedAt: null,
+      createdAt: new Date('2026-06-16T00:00:00Z'),
+    });
+    mockAddBalance.mockResolvedValue(undefined);
+    mockRecordUpdate.mockResolvedValue({
+      id: 'draw-2b',
+      prizeKey: 'fourth',
+      prizeName: '四等奖',
+      prizeAmount: 16.66,
+      issueStatus: 'ISSUED',
+      issuedAt: new Date('2026-06-16T00:00:01Z'),
+      createdAt: new Date('2026-06-16T00:00:00Z'),
+    });
+
+    const result = await drawDuanwuPrize(1, 'zh');
+    expect(result.prize.key).toBe('fourth');
+    randomSpy.mockRestore();
+  });
+
   it('falls back when first prize slots are full', async () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.999);
     mockOrders([
@@ -237,8 +276,8 @@ describe('duanwu activity service', () => {
       .mockRejectedValueOnce(createKnownRequestError('slot 3 full'))
       .mockResolvedValueOnce({
         id: 'draw-3',
-        prizeKey: 'third',
-        prizeName: '三等奖',
+        prizeKey: 'fourth',
+        prizeName: '四等奖',
         prizeAmount: 6.66,
         issueStatus: 'PENDING',
         issuedAt: null,
@@ -247,8 +286,8 @@ describe('duanwu activity service', () => {
     mockAddBalance.mockResolvedValue(undefined);
     mockRecordUpdate.mockResolvedValue({
       id: 'draw-3',
-      prizeKey: 'third',
-      prizeName: '三等奖',
+      prizeKey: 'fourth',
+      prizeName: '四等奖',
       prizeAmount: 6.66,
       issueStatus: 'ISSUED',
       issuedAt: new Date('2026-06-16T00:00:01Z'),
@@ -256,7 +295,7 @@ describe('duanwu activity service', () => {
     });
 
     const result = await drawDuanwuPrize(1, 'zh');
-    expect(result.prize.key).toBe('third');
+    expect(result.prize.key).toBe('fourth');
     randomSpy.mockRestore();
   });
 

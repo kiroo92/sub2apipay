@@ -247,6 +247,15 @@ function DuanwuPageContent() {
                     'This is a dedicated seasonal page. Eligibility is determined from your June 2026 recharge records, and qualified users can draw a festival reward.',
                   )}
                 </p>
+                <div
+                  className={[
+                    'mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold tracking-[0.12em]',
+                    isDark ? 'bg-amber-300/12 text-amber-100' : 'bg-amber-100 text-amber-700',
+                  ].join(' ')}
+                >
+                  <span>100%</span>
+                  <span>{pickLocaleText(locale, '中奖率', 'WIN RATE')}</span>
+                </div>
               </div>
             </div>
 
@@ -351,8 +360,8 @@ function DuanwuPageContent() {
               <div className={['text-xs leading-5', isDark ? 'text-emerald-50/55' : 'text-slate-500'].join(' ')}>
                 {pickLocaleText(
                   locale,
-                  '活动策略由系统后台自动判定，结果将在抽奖后即时到账。',
-                  'Reward rules are enforced server-side and the result is credited immediately after draw.',
+                  '100% 中奖，活动策略由系统后台自动判定，结果将在抽奖后即时到账。',
+                  '100% win rate. Reward rules are enforced server-side and the result is credited immediately after draw.',
                 )}
               </div>
             </div>

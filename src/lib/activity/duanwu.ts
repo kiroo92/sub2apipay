@@ -8,19 +8,21 @@ export const DUANWU_ACTIVITY_KEY = 'duanwu-2026';
 export const DUANWU_MIN_TOTAL_AMOUNT = 66.66;
 export const DUANWU_START_AT = new Date('2026-05-31T16:00:00.000Z');
 export const DUANWU_END_AT = new Date('2026-06-30T16:00:00.000Z');
+const DUANWU_MID_TIER_FLOOR_AMOUNT = 100;
 const DUANWU_HIGH_TIER_FLOOR_AMOUNT = 200;
 const DUANWU_FIRST_PRIZE_MAX_WINNERS = 3;
 const SUB2API_TIMEZONE = 'Asia/Shanghai';
 
 export interface DuanwuPrize {
-  key: 'third' | 'second' | 'first';
+  key: 'third' | 'fourth' | 'second' | 'first';
   name: string;
   amount: number;
   weight: number;
 }
 
 export const DUANWU_PRIZES: DuanwuPrize[] = [
-  { key: 'third', name: '三等奖', amount: 6.66, weight: 960 },
+  { key: 'third', name: '三等奖', amount: 16.66, weight: 120 },
+  { key: 'fourth', name: '四等奖', amount: 6.66, weight: 840 },
   { key: 'second', name: '二等奖', amount: 26.66, weight: 30 },
   { key: 'first', name: '一等奖', amount: 66.66, weight: 10 },
 ];
@@ -205,7 +207,12 @@ async function assignPrizeForUser(userId: number, orders: RechargeOrder[], total
   record: Awaited<ReturnType<typeof prisma.activityDrawRecord.create>>;
 }> {
   const hasHighTierFloor = totalRechargeAmount >= DUANWU_HIGH_TIER_FLOOR_AMOUNT;
-  const basePool = hasHighTierFloor ? DUANWU_PRIZES.filter((prize) => prize.key !== 'third') : DUANWU_PRIZES;
+  const hasMidTierFloor = totalRechargeAmount >= DUANWU_MID_TIER_FLOOR_AMOUNT;
+  const basePool = hasHighTierFloor
+    ? DUANWU_PRIZES.filter((prize) => prize.key === 'second' || prize.key === 'first')
+    : hasMidTierFloor
+      ? DUANWU_PRIZES.filter((prize) => prize.key !== 'third')
+      : DUANWU_PRIZES;
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const pickedPrize = pickPrizeFromPool(basePool);
