@@ -6,13 +6,15 @@ export function middleware(request: NextRequest) {
 
   const isDuanwuPage = pathname === '/duanwu';
   const isDuanwuApi = pathname === '/api/duanwu' || pathname.startsWith('/api/duanwu/');
+  const isAdminDuanwuPage = pathname === '/admin/duanwu';
+  const isAdminDuanwuApi = pathname === '/api/admin/duanwu' || pathname.startsWith('/api/admin/duanwu/');
   const isStaticAsset =
     pathname === '/favicon.ico' ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/icons/') ||
     pathname.includes('.');
 
-  if (!isDuanwuPage && !isDuanwuApi && !isStaticAsset) {
+  if (!isDuanwuPage && !isDuanwuApi && !isAdminDuanwuPage && !isAdminDuanwuApi && !isStaticAsset) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/duanwu';
     redirectUrl.search = searchParams.toString();
