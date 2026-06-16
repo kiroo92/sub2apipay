@@ -1,6 +1,6 @@
 services:
   app:
-    image: touwaeriol/sub2apipay:${IMAGE_TAG:-latest}
+    image: ghcr.io/kiroo92/sub2apipay:${IMAGE_TAG:-latest}
     container_name: sub2apipay
     ports:
       - '8087:3000'
