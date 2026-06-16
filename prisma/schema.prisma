@@ -6,63 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-model Order {
-  id            String      @id @default(cuid())
-  userId        Int         @map("user_id")
-  userEmail     String?     @map("user_email")
-  userName      String?     @map("user_name")
-  userNotes     String?     @map("user_notes")
-  amount        Decimal     @db.Decimal(10, 2)
-  payAmount     Decimal?    @db.Decimal(10, 2) @map("pay_amount")
-  feeRate       Decimal?    @db.Decimal(5, 4)  @map("fee_rate")
-  rechargeCode  String      @unique @map("recharge_code")
-  status        OrderStatus @default(PENDING)
-  paymentType   String      @map("payment_type")
-
-  paymentTradeNo String?    @map("payment_trade_no")
-  payUrl        String?     @map("pay_url")
-  qrCode        String?     @map("qr_code")
-  qrCodeImg     String?     @map("qr_code_img")
-
-  refundAmount  Decimal?    @db.Decimal(10, 2) @map("refund_amount")
-  refundReason  String?     @map("refund_reason")
-  refundAt      DateTime?   @map("refund_at")
-  forceRefund   Boolean     @default(false) @map("force_refund")
-  refundRequestedAt DateTime? @map("refund_requested_at")
-  refundRequestReason String? @map("refund_request_reason")
-  refundRequestedBy Int? @map("refund_requested_by")
-
-  expiresAt     DateTime    @map("expires_at")
-  paidAt        DateTime?   @map("paid_at")
-  completedAt   DateTime?   @map("completed_at")
-  failedAt      DateTime?   @map("failed_at")
-  failedReason  String?     @map("failed_reason")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  clientIp      String?     @map("client_ip")
-  srcHost       String?     @map("src_host")
-  srcUrl        String?     @map("src_url")
-
-  // ── 订单类型 & 订阅相关 ──
-  orderType           String             @default("balance") @map("order_type")
-  planId              String?            @map("plan_id")
-  plan                SubscriptionPlan?  @relation(fields: [planId], references: [id])
-  subscriptionGroupId Int?               @map("subscription_group_id")
-  subscriptionDays    Int?               @map("subscription_days")
-  providerInstanceId  String?  @map("provider_instance_id")
-
-  auditLogs     AuditLog[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([expiresAt])
-  @@index([createdAt])
-  @@index([paidAt])
-  @@index([paymentType, paidAt])
-  @@index([orderType])
-  @@map("orders")
-}
-
 enum ActivityRewardStatus {
   PENDING
   ISSUED
@@ -70,126 +13,24 @@ enum ActivityRewardStatus {
 }
 
 model ActivityDrawRecord {
-  id          String               @id @default(cuid())
-  activityKey String               @map("activity_key")
-  userId      Int                  @map("user_id")
-  rechargeOrderCount Int           @default(0) @map("recharge_order_count")
-  totalRechargeAmount Decimal      @db.Decimal(10, 2) @map("total_recharge_amount")
-  prizeKey    String               @map("prize_key")
-  prizeSlot   Int?                 @map("prize_slot")
-  prizeName   String               @map("prize_name")
-  prizeAmount Decimal              @db.Decimal(10, 2) @map("prize_amount")
-  issueStatus ActivityRewardStatus @default(PENDING) @map("issue_status")
-  issueError  String?              @db.Text @map("issue_error")
-  issuedAt    DateTime?            @map("issued_at")
-  createdAt   DateTime             @default(now()) @map("created_at")
-  updatedAt   DateTime             @updatedAt @map("updated_at")
+  id                  String               @id @default(cuid())
+  activityKey         String               @map("activity_key")
+  userId              Int                  @map("user_id")
+  rechargeOrderCount  Int                  @default(0) @map("recharge_order_count")
+  totalRechargeAmount Decimal              @db.Decimal(10, 2) @map("total_recharge_amount")
+  prizeKey            String               @map("prize_key")
+  prizeSlot           Int?                 @map("prize_slot")
+  prizeName           String               @map("prize_name")
+  prizeAmount         Decimal              @db.Decimal(10, 2) @map("prize_amount")
+  issueStatus         ActivityRewardStatus @default(PENDING) @map("issue_status")
+  issueError          String?              @db.Text @map("issue_error")
+  issuedAt            DateTime?            @map("issued_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
   @@unique([activityKey, userId])
   @@unique([activityKey, prizeKey, prizeSlot])
   @@index([activityKey, userId])
   @@index([userId, createdAt])
   @@map("activity_draw_records")
-}
-
-enum OrderStatus {
-  PENDING
-  PAID
-  RECHARGING
-  COMPLETED
-  EXPIRED
-  CANCELLED
-  FAILED
-  REFUND_REQUESTED
-  REFUNDING
-  PARTIALLY_REFUNDED
-  REFUNDED
-  REFUND_FAILED
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  orderId   String   @map("order_id")
-  order     Order    @relation(fields: [orderId], references: [id])
-  action    String
-  detail    String?  @db.Text
-  operator  String?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([orderId])
-  @@index([createdAt])
-  @@map("audit_logs")
-}
-
-// ── 渠道展示配置 ──
-model Channel {
-  id             String   @id @default(cuid())
-  groupId        Int?     @unique @map("group_id")
-  name           String
-  platform       String   @default("claude")
-  rateMultiplier Decimal  @db.Decimal(10, 4) @map("rate_multiplier")
-  description    String?  @db.Text
-  models         String?  @db.Text
-  features       String?  @db.Text
-  sortOrder      Int      @default(0) @map("sort_order")
-  enabled        Boolean  @default(true)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  @@index([sortOrder])
-  @@map("channels")
-}
-
-// ── 订阅套餐配置 ──
-model SubscriptionPlan {
-  id            String   @id @default(cuid())
-  groupId       Int?     @map("group_id")
-  name          String
-  description   String?  @db.Text
-  price         Decimal  @db.Decimal(10, 2)
-  originalPrice Decimal? @db.Decimal(10, 2) @map("original_price")
-  validityDays  Int      @default(30) @map("validity_days")
-  validityUnit  String   @default("day") @map("validity_unit") // day | week | month
-  features      String?  @db.Text
-  productName   String?  @map("product_name")
-  forSale       Boolean  @default(false) @map("for_sale")
-  sortOrder     Int      @default(0) @map("sort_order")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  orders        Order[]
-
-  @@index([forSale, sortOrder])
-  @@map("subscription_plans")
-}
-
-// ── 系统配置 ──
-model SystemConfig {
-  key       String   @id
-  value     String   @db.Text
-  group     String   @default("general")
-  label     String?
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([group])
-  @@map("system_configs")
-}
-
-// ── 支付服务商实例（多实例轮询） ──
-model PaymentProviderInstance {
-  id             String   @id @default(cuid())
-  providerKey    String   @map("provider_key") // easypay, alipay, wxpay, stripe
-  name           String   // display name like "易支付A"
-  config         String   @db.Text // encrypted JSON credentials
-  supportedTypes String   @default("") @map("supported_types") // comma-separated: alipay,wxpay,stripe
-  enabled        Boolean  @default(true)
-  sortOrder      Int      @default(0) @map("sort_order")
-  limits         String?  @db.Text // JSON per-channel limits: { "alipay": { "dailyLimit": 10000, "singleLimit": 1000 } }
-  refundEnabled  Boolean  @default(false) @map("refund_enabled")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  @@index([providerKey])
-  @@index([providerKey, enabled])
-  @@map("payment_provider_instances")
 }

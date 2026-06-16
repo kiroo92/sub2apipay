@@ -1,1 +1,0 @@
-export { WxpayProvider } from './provider';

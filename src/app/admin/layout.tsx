@@ -5,12 +5,7 @@ import { Suspense } from 'react';
 import { resolveLocale } from '@/lib/locale';
 
 const NAV_ITEMS = [
-  { path: '/admin', label: { zh: '数据概览', en: 'Dashboard' } },
-  { path: '/admin/orders', label: { zh: '订单管理', en: 'Orders' } },
   { path: '/admin/duanwu', label: { zh: '端午活动', en: 'Duanwu' } },
-  { path: '/admin/payment-config', label: { zh: '支付配置', en: 'Payment Config' } },
-  { path: '/admin/channels', label: { zh: '渠道管理', en: 'Channels' } },
-  { path: '/admin/subscriptions', label: { zh: '订阅管理', en: 'Subscriptions' } },
 ];
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
@@ -32,7 +27,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   };
 
   const isActive = (navPath: string) => {
-    if (navPath === '/admin') return pathname === '/admin' || pathname === '/admin/dashboard';
     return pathname.startsWith(navPath);
   };
 

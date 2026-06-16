@@ -3,8 +3,8 @@ import { headers } from 'next/headers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Sub2API Recharge',
-  description: 'Sub2API balance recharge platform',
+  title: 'Sub2API Activity',
+  description: 'Sub2API seasonal activity app',
 };
 
 export default async function RootLayout({
