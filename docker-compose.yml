@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: ghcr.io/kiroo92/sub2apipay:${IMAGE_TAG:-latest}
     ports:
       - '${APP_PORT:-3001}:3000'
     env_file: .env

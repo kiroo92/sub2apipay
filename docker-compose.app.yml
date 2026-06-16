@@ -1,5 +1,5 @@
 # docker-compose.app.yml
-# 使用 Docker Hub 镜像部署（仅应用，外部数据库）
+# 使用 GHCR 镜像部署（仅应用，外部数据库）
 # 适合：已有 PostgreSQL 实例，将 DATABASE_URL 填入 .env
 #
 # 启动：IMAGE_TAG=1.0.0 docker compose -f docker-compose.app.yml up -d
@@ -8,7 +8,7 @@
 
 services:
   app:
-    image: touwaeriol/sub2apipay:${IMAGE_TAG:-latest}
+    image: ghcr.io/kiroo92/sub2apipay:${IMAGE_TAG:-latest}
     ports:
       - '${APP_PORT:-3001}:3000'
     env_file: .env

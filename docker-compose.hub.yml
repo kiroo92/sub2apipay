@@ -1,5 +1,5 @@
 # docker-compose.hub.yml
-# 使用 Docker Hub 镜像部署（含自带 PostgreSQL）
+# 使用 GHCR 镜像部署（含自带 PostgreSQL）
 # 适合：全新服务器，无现有数据库
 #
 # 启动：IMAGE_TAG=1.0.0 docker compose -f docker-compose.hub.yml up -d
@@ -8,7 +8,7 @@
 
 services:
   app:
-    image: touwaeriol/sub2apipay:${IMAGE_TAG:-latest}
+    image: ghcr.io/kiroo92/sub2apipay:${IMAGE_TAG:-latest}
     ports:
       - '${APP_PORT:-3001}:3000'
     env_file: .env
