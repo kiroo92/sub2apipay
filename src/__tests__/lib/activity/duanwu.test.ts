@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockOrderFindMany = vi.fn();
 const mockRecordFindUnique = vi.fn();
 const mockRecordCreate = vi.fn();
 const mockRecordUpdate = vi.fn();
 const mockAddBalance = vi.fn();
+const mockListPaymentOrders = vi.fn();
 
 vi.mock('@prisma/client', () => ({
   Prisma: {
@@ -28,9 +28,6 @@ vi.mock('@prisma/client', () => ({
 
 vi.mock('@/lib/db', () => ({
   prisma: {
-    order: {
-      findMany: (...args: unknown[]) => mockOrderFindMany(...args),
-    },
     activityDrawRecord: {
       findUnique: (...args: unknown[]) => mockRecordFindUnique(...args),
       create: (...args: unknown[]) => mockRecordCreate(...args),
@@ -41,6 +38,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/sub2api/client', () => ({
   addBalance: (...args: unknown[]) => mockAddBalance(...args),
+  listPaymentOrders: (...args: unknown[]) => mockListPaymentOrders(...args),
 }));
 
 import { ActivityError, drawDuanwuPrize, getDuanwuActivityData } from '@/lib/activity/duanwu';
@@ -53,28 +51,48 @@ function createKnownRequestError(message: string, code = 'P2002') {
   );
 }
 
+function mockOrders(items: Array<Record<string, unknown>>) {
+  mockListPaymentOrders.mockResolvedValue({
+    items,
+    total: items.length,
+    page: 1,
+    page_size: 100,
+  });
+}
+
 describe('duanwu activity service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('counts only june 2026 paid recharge orders', async () => {
-    mockOrderFindMany.mockResolvedValue([
+  it('counts only june 2026 paid recharge orders from sub2api payment api', async () => {
+    mockOrders([
       {
         id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
         amount: 40,
-        createdAt: new Date('2026-06-02T00:00:00Z'),
-        paidAt: new Date('2026-06-02T00:01:00Z'),
-        paymentType: 'alipay',
-        status: 'COMPLETED',
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-02T00:01:00.000Z',
       },
       {
         id: 'order-2',
+        user_id: 1,
+        user_name: 'user1',
         amount: 30,
-        createdAt: new Date('2026-06-10T00:00:00Z'),
-        paidAt: new Date('2026-06-10T00:01:00Z'),
-        paymentType: 'wxpay',
-        status: 'COMPLETED',
+        payment_type: 'wxpay',
+        status: 'paid',
+        paid_at: '2026-06-10T00:01:00.000Z',
+      },
+      {
+        id: 'order-3',
+        user_id: 2,
+        user_name: 'user2',
+        amount: 999,
+        payment_type: 'wxpay',
+        status: 'paid',
+        paid_at: '2026-06-10T00:01:00.000Z',
       },
     ]);
     mockRecordFindUnique.mockResolvedValue(null);
@@ -85,20 +103,19 @@ describe('duanwu activity service', () => {
     expect(result.stats.totalRechargeAmount).toBe(70);
     expect(result.stats.eligible).toBe(true);
     expect(result.stats.canDraw).toBe(true);
-    expect(result.activity.startAt).toBeInstanceOf(Date);
-    expect(result.activity.endAt).toBeInstanceOf(Date);
   });
 
   it('creates one draw record per user and issues prize', async () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.05);
-    mockOrderFindMany.mockResolvedValue([
+    mockOrders([
       {
         id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
         amount: 66.66,
-        createdAt: new Date('2026-06-05T00:00:00Z'),
-        paidAt: new Date('2026-06-05T00:01:00Z'),
-        paymentType: 'alipay',
-        status: 'COMPLETED',
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-05T00:01:00.000Z',
       },
     ]);
     mockRecordFindUnique.mockResolvedValueOnce(null);
@@ -128,19 +145,19 @@ describe('duanwu activity service', () => {
     expect(mockAddBalance).toHaveBeenCalledTimes(1);
     expect(result.prize.name).toBe('三等奖');
     expect(result.alreadyDrawn).toBe(false);
-    expect(result.reissue).toBe(false);
     randomSpy.mockRestore();
   });
 
   it('reuses existing draw record and does not redraw', async () => {
-    mockOrderFindMany.mockResolvedValue([
+    mockOrders([
       {
         id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
         amount: 80,
-        createdAt: new Date('2026-06-05T00:00:00Z'),
-        paidAt: new Date('2026-06-05T00:01:00Z'),
-        paymentType: 'alipay',
-        status: 'COMPLETED',
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-05T00:01:00.000Z',
       },
     ]);
     mockRecordFindUnique.mockResolvedValue({
@@ -159,19 +176,19 @@ describe('duanwu activity service', () => {
     expect(mockAddBalance).not.toHaveBeenCalled();
     expect(result.prize.amount).toBe(26.66);
     expect(result.alreadyDrawn).toBe(true);
-    expect(result.reissue).toBe(false);
   });
 
   it('guarantees at least second prize when june total is 200 or more', async () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    mockOrderFindMany.mockResolvedValue([
+    mockOrders([
       {
         id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
         amount: 200,
-        createdAt: new Date('2026-06-05T00:00:00Z'),
-        paidAt: new Date('2026-06-05T00:01:00Z'),
-        paymentType: 'alipay',
-        status: 'COMPLETED',
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-05T00:01:00.000Z',
       },
     ]);
     mockRecordFindUnique.mockResolvedValueOnce(null);
@@ -196,21 +213,21 @@ describe('duanwu activity service', () => {
     });
 
     const result = await drawDuanwuPrize(1, 'zh');
-
     expect(result.prize.key).toBe('second');
     randomSpy.mockRestore();
   });
 
   it('falls back when first prize slots are full', async () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.999);
-    mockOrderFindMany.mockResolvedValue([
+    mockOrders([
       {
         id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
         amount: 100,
-        createdAt: new Date('2026-06-05T00:00:00Z'),
-        paidAt: new Date('2026-06-05T00:01:00Z'),
-        paymentType: 'alipay',
-        status: 'COMPLETED',
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-05T00:01:00.000Z',
       },
     ]);
     mockRecordFindUnique.mockResolvedValueOnce(null);
@@ -239,20 +256,20 @@ describe('duanwu activity service', () => {
     });
 
     const result = await drawDuanwuPrize(1, 'zh');
-
     expect(result.prize.key).toBe('third');
     randomSpy.mockRestore();
   });
 
   it('rejects when june total recharge is below threshold', async () => {
-    mockOrderFindMany.mockResolvedValue([
+    mockOrders([
       {
         id: 'order-1',
+        user_id: 1,
+        user_name: 'user1',
         amount: 20,
-        createdAt: new Date('2026-06-05T00:00:00Z'),
-        paidAt: new Date('2026-06-05T00:01:00Z'),
-        paymentType: 'alipay',
-        status: 'COMPLETED',
+        payment_type: 'alipay',
+        status: 'paid',
+        paid_at: '2026-06-05T00:01:00.000Z',
       },
     ]);
     mockRecordFindUnique.mockResolvedValue(null);

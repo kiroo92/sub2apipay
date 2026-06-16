@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
-import { DUANWU_ACTIVITY_KEY, DUANWU_MIN_TOTAL_AMOUNT, DUANWU_START_AT, DUANWU_END_AT } from '@/lib/activity/duanwu';
-import { ORDER_STATUS } from '@/lib/constants';
+import {
+  DUANWU_ACTIVITY_KEY,
+  DUANWU_MIN_TOTAL_AMOUNT,
+  DUANWU_START_AT,
+  DUANWU_END_AT,
+  loadAllDuanwuRechargeOrders,
+} from '@/lib/activity/duanwu';
 
 export async function GET(request: NextRequest) {
   if (!(await verifyAdminToken(request))) return unauthorizedResponse(request);
@@ -13,33 +17,13 @@ export async function GET(request: NextRequest) {
   const pageSize = Math.min(100, Math.max(1, Number(searchParams.get('page_size') || '20')));
   const prizeKey = searchParams.get('prizeKey')?.trim();
   const issueStatus = searchParams.get('issueStatus')?.trim();
-  const keyword = searchParams.get('keyword')?.trim();
+  const rawKeyword = searchParams.get('keyword')?.trim() || '';
+  const keyword = rawKeyword.toLowerCase();
 
-  const rechargeWhere: Prisma.OrderWhereInput = {
-    orderType: 'balance',
-    status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
-    paidAt: { gte: DUANWU_START_AT, lt: DUANWU_END_AT },
-  };
-
-  const where: Prisma.ActivityDrawRecordWhereInput = {
-    activityKey: DUANWU_ACTIVITY_KEY,
-  };
-  if (prizeKey) where.prizeKey = prizeKey;
-  if (issueStatus) where.issueStatus = issueStatus as 'PENDING' | 'ISSUED' | 'ISSUE_FAILED';
-  if (keyword) {
-    const maybeUserId = Number(keyword);
-    where.OR = [
-      Number.isFinite(maybeUserId) ? { userId: maybeUserId } : undefined,
-      { prizeName: { contains: keyword, mode: 'insensitive' } },
-    ].filter(Boolean) as Prisma.ActivityDrawRecordWhereInput[];
-  }
-
-  const [summaryAgg, recordCount, prizeGroups, issueGroups, records, total, qualifiedUsersAgg] = await Promise.all([
-    prisma.activityDrawRecord.aggregate({
-      where: { activityKey: DUANWU_ACTIVITY_KEY },
-      _sum: { prizeAmount: true, totalRechargeAmount: true },
-      _count: { _all: true },
-    }),
+  const [allRechargeOrders, recordCount, prizeGroups, issueGroups] = await Promise.all([
+    rawKeyword
+      ? loadAllDuanwuRechargeOrders(rawKeyword)
+      : loadAllDuanwuRechargeOrders(),
     prisma.activityDrawRecord.count({ where: { activityKey: DUANWU_ACTIVITY_KEY } }),
     prisma.activityDrawRecord.groupBy({
       by: ['prizeKey', 'prizeName'],
@@ -52,72 +36,89 @@ export async function GET(request: NextRequest) {
       where: { activityKey: DUANWU_ACTIVITY_KEY },
       _count: { _all: true },
     }),
-    prisma.activityDrawRecord.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        userId: true,
-        rechargeOrderCount: true,
-        totalRechargeAmount: true,
-        prizeKey: true,
-        prizeName: true,
-        prizeAmount: true,
-        issueStatus: true,
-        issueError: true,
-        issuedAt: true,
-        createdAt: true,
-      },
-    }),
-    prisma.activityDrawRecord.count({ where }),
-    prisma.order.groupBy({
-      by: ['userId'],
-      where: rechargeWhere,
-      _sum: { amount: true },
-    }),
   ]);
 
-  const qualifiedUsers = qualifiedUsersAgg.filter((row) => Number(row._sum.amount ?? 0) >= DUANWU_MIN_TOTAL_AMOUNT).length;
-  const userIds = [...new Set(records.map((item) => item.userId))];
-  const userOrdersAgg = await prisma.order.groupBy({
-    by: ['userId'],
-    where: userIds.length > 0 ? { ...rechargeWhere, userId: { in: userIds } } : { ...rechargeWhere, userId: -1 },
-    _sum: { amount: true },
-    _count: { _all: true },
-  });
-  const userInfo = await prisma.order.findMany({
-    where: userIds.length > 0 ? { userId: { in: userIds } } : { userId: -1 },
+  const rechargeMap = new Map<
+    number,
+    {
+      userId: number;
+      userName: string | null;
+      userEmail: string | null;
+      userNotes: string | null;
+      rechargeOrderCount: number;
+      totalRechargeAmount: number;
+    }
+  >();
+
+  for (const order of allRechargeOrders) {
+    const current = rechargeMap.get(order.userId) ?? {
+      userId: order.userId,
+      userName: order.userName,
+      userEmail: order.userEmail,
+      userNotes: order.userNotes,
+      rechargeOrderCount: 0,
+      totalRechargeAmount: 0,
+    };
+    current.rechargeOrderCount += 1;
+    current.totalRechargeAmount += order.amount;
+    if (!current.userName && order.userName) current.userName = order.userName;
+    if (!current.userEmail && order.userEmail) current.userEmail = order.userEmail;
+    if (!current.userNotes && order.userNotes) current.userNotes = order.userNotes;
+    rechargeMap.set(order.userId, current);
+  }
+
+  const qualifiedUsers = [...rechargeMap.values()].filter((item) => item.totalRechargeAmount >= DUANWU_MIN_TOTAL_AMOUNT).length;
+
+  const recordWhere = {
+    activityKey: DUANWU_ACTIVITY_KEY,
+    ...(prizeKey ? { prizeKey } : {}),
+    ...(issueStatus ? { issueStatus: issueStatus as 'PENDING' | 'ISSUED' | 'ISSUE_FAILED' } : {}),
+  };
+
+  const allRecords = await prisma.activityDrawRecord.findMany({
+    where: recordWhere,
     orderBy: { createdAt: 'desc' },
-    distinct: ['userId'],
     select: {
+      id: true,
       userId: true,
-      userName: true,
-      userEmail: true,
-      userNotes: true,
+      rechargeOrderCount: true,
+      totalRechargeAmount: true,
+      prizeKey: true,
+      prizeName: true,
+      prizeAmount: true,
+      issueStatus: true,
+      issueError: true,
+      issuedAt: true,
+      createdAt: true,
     },
   });
 
-  const userMetaMap = new Map(
-    userInfo.map((item) => [
-      item.userId,
-      {
-        userName: item.userName,
-        userEmail: item.userEmail,
-        userNotes: item.userNotes,
-      },
-    ]),
-  );
-  const orderAggMap = new Map(
-    userOrdersAgg.map((item) => [
-      item.userId,
-      {
-        totalRechargeAmount: Number(item._sum.amount ?? 0),
-        rechargeOrderCount: item._count._all,
-      },
-    ]),
-  );
+  const enrichedRecords = allRecords
+    .map((record) => {
+      const recharge = rechargeMap.get(record.userId);
+      return {
+        id: record.id,
+        userId: record.userId,
+        userName: recharge?.userName ?? null,
+        userEmail: recharge?.userEmail ?? null,
+        userNotes: recharge?.userNotes ?? null,
+        rechargeOrderCount: recharge?.rechargeOrderCount ?? record.rechargeOrderCount,
+        totalRechargeAmount: recharge?.totalRechargeAmount ?? Number(record.totalRechargeAmount),
+        prizeKey: record.prizeKey,
+        prizeName: record.prizeName,
+        prizeAmount: Number(record.prizeAmount),
+        issueStatus: record.issueStatus,
+        issueError: record.issueError,
+        issuedAt: record.issuedAt,
+        createdAt: record.createdAt,
+      };
+    })
+    .filter((record) => {
+      if (!keyword) return true;
+      return String(record.userId).includes(keyword) || record.prizeName.toLowerCase().includes(keyword);
+    });
+
+  const pagedRecords = enrichedRecords.slice((page - 1) * pageSize, page * pageSize);
 
   return NextResponse.json({
     activity: {
@@ -129,8 +130,8 @@ export async function GET(request: NextRequest) {
     summary: {
       participantCount: recordCount,
       qualifiedUserCount: qualifiedUsers,
-      issuedRewardAmount: Number(summaryAgg._sum.prizeAmount ?? 0),
-      participantRechargeAmount: Number(summaryAgg._sum.totalRechargeAmount ?? 0),
+      issuedRewardAmount: prizeGroups.reduce((sum, group) => sum + Number(group._sum.prizeAmount ?? 0), 0),
+      participantRechargeAmount: [...rechargeMap.values()].reduce((sum, item) => sum + item.totalRechargeAmount, 0),
     },
     prizeStats: prizeGroups.map((group) => ({
       prizeKey: group.prizeKey,
@@ -142,29 +143,10 @@ export async function GET(request: NextRequest) {
       issueStatus: group.issueStatus,
       count: group._count._all,
     })),
-    records: records.map((record) => {
-      const userMeta = userMetaMap.get(record.userId);
-      const orderAgg = orderAggMap.get(record.userId);
-      return {
-        id: record.id,
-        userId: record.userId,
-        userName: userMeta?.userName ?? null,
-        userEmail: userMeta?.userEmail ?? null,
-        userNotes: userMeta?.userNotes ?? null,
-        rechargeOrderCount: orderAgg?.rechargeOrderCount ?? record.rechargeOrderCount,
-        totalRechargeAmount: orderAgg?.totalRechargeAmount ?? Number(record.totalRechargeAmount),
-        prizeKey: record.prizeKey,
-        prizeName: record.prizeName,
-        prizeAmount: Number(record.prizeAmount),
-        issueStatus: record.issueStatus,
-        issueError: record.issueError,
-        issuedAt: record.issuedAt,
-        createdAt: record.createdAt,
-      };
-    }),
-    total,
+    records: pagedRecords,
+    total: enrichedRecords.length,
     page,
     page_size: pageSize,
-    total_pages: Math.ceil(total / pageSize),
+    total_pages: Math.ceil(enrichedRecords.length / pageSize),
   });
 }

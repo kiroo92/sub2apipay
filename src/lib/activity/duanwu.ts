@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { addBalance } from '@/lib/sub2api/client';
-import { ORDER_STATUS } from '@/lib/constants';
+import { addBalance, listPaymentOrders } from '@/lib/sub2api/client';
 import { pickLocaleText, type Locale } from '@/lib/locale';
+import type { Sub2ApiPaymentOrder } from '@/lib/sub2api/types';
 
 export const DUANWU_ACTIVITY_KEY = 'duanwu-2026';
 export const DUANWU_MIN_TOTAL_AMOUNT = 66.66;
@@ -10,6 +10,7 @@ export const DUANWU_START_AT = new Date('2026-05-31T16:00:00.000Z');
 export const DUANWU_END_AT = new Date('2026-06-30T16:00:00.000Z');
 const DUANWU_HIGH_TIER_FLOOR_AMOUNT = 200;
 const DUANWU_FIRST_PRIZE_MAX_WINNERS = 3;
+const SUB2API_TIMEZONE = 'Asia/Shanghai';
 
 export interface DuanwuPrize {
   key: 'third' | 'second' | 'first';
@@ -24,21 +25,21 @@ export const DUANWU_PRIZES: DuanwuPrize[] = [
   { key: 'first', name: '一等奖', amount: 66.66, weight: 10 },
 ];
 
-type RechargeOrder = {
+export interface RechargeOrder {
   id: string;
-  amount: Prisma.Decimal;
-  createdAt: Date;
+  userId: number;
+  userName: string | null;
+  userEmail: string | null;
+  userNotes: string | null;
+  amount: number;
+  createdAt: Date | null;
   paidAt: Date | null;
   paymentType: string;
   status: string;
-};
+}
 
 function msg(locale: Locale, zh: string, en: string) {
   return pickLocaleText(locale, zh, en);
-}
-
-function toNumber(value: Prisma.Decimal | number | null | undefined): number {
-  return Number(value ?? 0);
 }
 
 function pickPrizeFromPool(pool: DuanwuPrize[], randomValue = Math.random()): DuanwuPrize {
@@ -51,6 +52,68 @@ function pickPrizeFromPool(pool: DuanwuPrize[], randomValue = Math.random()): Du
   return pool[0];
 }
 
+function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function normalizeRechargeOrder(raw: Sub2ApiPaymentOrder): RechargeOrder | null {
+  const userId = Number(raw.user_id);
+  if (!Number.isFinite(userId) || userId <= 0) return null;
+
+  return {
+    id: String(raw.id),
+    userId,
+    userName: raw.user_name ?? null,
+    userEmail: raw.user_email ?? null,
+    userNotes: raw.user_notes ?? null,
+    amount: Number(raw.amount ?? 0),
+    createdAt: parseDate(raw.created_at ?? null),
+    paidAt: parseDate(raw.paid_at ?? null),
+    paymentType: raw.payment_type ?? '',
+    status: raw.status ?? '',
+  };
+}
+
+function isPaidRechargeOrder(order: RechargeOrder): boolean {
+  return order.amount > 0 && order.paidAt !== null;
+}
+
+async function fetchAllPaymentOrders(keyword?: string): Promise<RechargeOrder[]> {
+  const pageSize = 100;
+  let page = 1;
+  const items: RechargeOrder[] = [];
+  let totalPages = 1;
+
+  do {
+    const result = await listPaymentOrders({
+      page,
+      page_size: pageSize,
+      timezone: SUB2API_TIMEZONE,
+      keyword,
+    });
+    const normalized = result.items.map(normalizeRechargeOrder).filter(Boolean) as RechargeOrder[];
+    items.push(...normalized.filter(isPaidRechargeOrder));
+    totalPages = Math.max(1, result.total ? Math.ceil(result.total / result.page_size) : page);
+    page += 1;
+  } while (page <= totalPages);
+
+  return items;
+}
+
+export async function loadRechargeOrders(userId: number): Promise<RechargeOrder[]> {
+  const orders = await fetchAllPaymentOrders();
+  return orders
+    .filter((order) => order.userId === userId && order.paidAt && order.paidAt >= DUANWU_START_AT && order.paidAt < DUANWU_END_AT)
+    .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
+}
+
+export async function loadAllDuanwuRechargeOrders(keyword?: string): Promise<RechargeOrder[]> {
+  const orders = await fetchAllPaymentOrders(keyword);
+  return orders.filter((order) => order.paidAt && order.paidAt >= DUANWU_START_AT && order.paidAt < DUANWU_END_AT);
+}
+
 export class ActivityError extends Error {
   code: string;
   statusCode: number;
@@ -61,30 +124,6 @@ export class ActivityError extends Error {
     this.code = code;
     this.statusCode = statusCode;
   }
-}
-
-async function loadRechargeOrders(userId: number): Promise<RechargeOrder[]> {
-  return prisma.order.findMany({
-    where: {
-      userId,
-      orderType: 'balance',
-      status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
-      paidAt: {
-        not: null,
-        gte: DUANWU_START_AT,
-        lt: DUANWU_END_AT,
-      },
-    },
-    orderBy: [{ paidAt: 'desc' }, { createdAt: 'desc' }],
-    select: {
-      id: true,
-      amount: true,
-      createdAt: true,
-      paidAt: true,
-      paymentType: true,
-      status: true,
-    },
-  });
 }
 
 export async function getDuanwuActivityData(userId: number) {
@@ -107,7 +146,7 @@ export async function getDuanwuActivityData(userId: number) {
     }),
   ]);
 
-  const totalRechargeAmount = orders.reduce((sum, order) => sum + toNumber(order.amount), 0);
+  const totalRechargeAmount = orders.reduce((sum, order) => sum + order.amount, 0);
   const eligible = totalRechargeAmount >= DUANWU_MIN_TOTAL_AMOUNT;
 
   return {
@@ -125,7 +164,7 @@ export async function getDuanwuActivityData(userId: number) {
     },
     orders: orders.map((order) => ({
       id: order.id,
-      amount: toNumber(order.amount),
+      amount: order.amount,
       createdAt: order.createdAt,
       paidAt: order.paidAt,
       paymentType: order.paymentType,
@@ -136,13 +175,13 @@ export async function getDuanwuActivityData(userId: number) {
           id: record.id,
           prizeKey: record.prizeKey,
           prizeName: record.prizeName,
-          prizeAmount: toNumber(record.prizeAmount),
+          prizeAmount: Number(record.prizeAmount),
           issueStatus: record.issueStatus,
           issueError: record.issueError,
           createdAt: record.createdAt,
           issuedAt: record.issuedAt,
           rechargeOrderCount: record.rechargeOrderCount,
-          totalRechargeAmount: toNumber(record.totalRechargeAmount),
+          totalRechargeAmount: Number(record.totalRechargeAmount),
         }
       : null,
     stats: {
@@ -166,14 +205,7 @@ async function assignPrizeForUser(userId: number, orders: RechargeOrder[], total
   record: Awaited<ReturnType<typeof prisma.activityDrawRecord.create>>;
 }> {
   const hasHighTierFloor = totalRechargeAmount >= DUANWU_HIGH_TIER_FLOOR_AMOUNT;
-  const basePool = hasHighTierFloor
-    ? DUANWU_PRIZES.filter((prize) => prize.key !== 'third')
-    : DUANWU_PRIZES;
-
-  const firstPrize = DUANWU_PRIZES.find((prize) => prize.key === 'first');
-  if (!firstPrize) {
-    throw new ActivityError('PRIZE_NOT_FOUND', '一等奖配置不存在', 500);
-  }
+  const basePool = hasHighTierFloor ? DUANWU_PRIZES.filter((prize) => prize.key !== 'third') : DUANWU_PRIZES;
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const pickedPrize = pickPrizeFromPool(basePool);
@@ -206,9 +238,7 @@ async function assignPrizeForUser(userId: number, orders: RechargeOrder[], total
 
     if (pickedPrize.key === 'first') {
       const fallbackPool = basePool.filter((prize) => prize.key !== 'first');
-      if (fallbackPool.length === 0) {
-        throw new ActivityError('DRAW_FAILED', '无可用奖品名额', 500);
-      }
+      if (fallbackPool.length === 0) throw new ActivityError('DRAW_FAILED', '无可用奖品名额', 500);
       const fallbackPrize = pickPrizeFromPool(fallbackPool);
       const record = await prisma.activityDrawRecord.create({
         data: {
@@ -231,7 +261,7 @@ async function assignPrizeForUser(userId: number, orders: RechargeOrder[], total
 
 export async function drawDuanwuPrize(userId: number, locale: Locale = 'zh') {
   const orders = await loadRechargeOrders(userId);
-  const totalRechargeAmount = orders.reduce((sum, order) => sum + toNumber(order.amount), 0);
+  const totalRechargeAmount = orders.reduce((sum, order) => sum + order.amount, 0);
 
   if (totalRechargeAmount < DUANWU_MIN_TOTAL_AMOUNT) {
     throw new ActivityError(
@@ -268,8 +298,8 @@ export async function drawDuanwuPrize(userId: number, locale: Locale = 'zh') {
   if (!record) {
     throw new ActivityError('DRAW_FAILED', msg(locale, '创建抽奖记录失败', 'Failed to create draw record'), 500);
   }
-  const finalRecord = record;
 
+  const finalRecord = record;
   const prize = DUANWU_PRIZES.find((item) => item.key === finalRecord.prizeKey);
   if (!prize) {
     throw new ActivityError('PRIZE_NOT_FOUND', msg(locale, '奖品配置不存在', 'Prize config not found'), 500);
@@ -310,7 +340,7 @@ export async function drawDuanwuPrize(userId: number, locale: Locale = 'zh') {
     prize: {
       key: record.prizeKey,
       name: record.prizeName,
-      amount: toNumber(record.prizeAmount),
+      amount: Number(record.prizeAmount),
     },
     issueStatus: record.issueStatus,
     issuedAt: record.issuedAt,
