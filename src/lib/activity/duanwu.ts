@@ -211,7 +211,7 @@ async function assignPrizeForUser(userId: number, orders: RechargeOrder[], total
   const basePool = hasHighTierFloor
     ? DUANWU_PRIZES.filter((prize) => prize.key === 'second' || prize.key === 'first')
     : hasMidTierFloor
-      ? DUANWU_PRIZES.filter((prize) => prize.key !== 'third')
+      ? DUANWU_PRIZES.filter((prize) => prize.key !== 'fourth')
       : DUANWU_PRIZES;
 
   for (let attempt = 0; attempt < 12; attempt += 1) {

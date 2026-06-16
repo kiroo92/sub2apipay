@@ -233,8 +233,8 @@ describe('duanwu activity service', () => {
     mockRecordFindUnique.mockResolvedValueOnce(null);
     mockRecordCreate.mockResolvedValue({
       id: 'draw-2b',
-      prizeKey: 'fourth',
-      prizeName: '四等奖',
+      prizeKey: 'third',
+      prizeName: '三等奖',
       prizeAmount: 16.66,
       issueStatus: 'PENDING',
       issuedAt: null,
@@ -243,8 +243,8 @@ describe('duanwu activity service', () => {
     mockAddBalance.mockResolvedValue(undefined);
     mockRecordUpdate.mockResolvedValue({
       id: 'draw-2b',
-      prizeKey: 'fourth',
-      prizeName: '四等奖',
+      prizeKey: 'third',
+      prizeName: '三等奖',
       prizeAmount: 16.66,
       issueStatus: 'ISSUED',
       issuedAt: new Date('2026-06-16T00:00:01Z'),
@@ -252,7 +252,7 @@ describe('duanwu activity service', () => {
     });
 
     const result = await drawDuanwuPrize(1, 'zh');
-    expect(result.prize.key).toBe('fourth');
+    expect(result.prize.key).toBe('third');
     randomSpy.mockRestore();
   });
 

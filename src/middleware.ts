@@ -5,8 +5,8 @@ export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   const isDuanwuPage = pathname === '/duanwu';
+  const isAdminPage = pathname === '/admin' || pathname.startsWith('/admin/');
   const isDuanwuApi = pathname === '/api/duanwu' || pathname.startsWith('/api/duanwu/');
-  const isAdminDuanwuPage = pathname === '/admin/duanwu';
   const isAdminDuanwuApi = pathname === '/api/admin/duanwu' || pathname.startsWith('/api/admin/duanwu/');
   const isStaticAsset =
     pathname === '/favicon.ico' ||
@@ -14,7 +14,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/icons/') ||
     pathname.includes('.');
 
-  if (!isDuanwuPage && !isDuanwuApi && !isAdminDuanwuPage && !isAdminDuanwuApi && !isStaticAsset) {
+  if (!isDuanwuPage && !isAdminPage && !isDuanwuApi && !isAdminDuanwuApi && !isStaticAsset) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/duanwu';
     redirectUrl.search = searchParams.toString();
