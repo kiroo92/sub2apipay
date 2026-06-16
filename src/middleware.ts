@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl;
+
+  const isDuanwuPage = pathname === '/duanwu';
+  const isDuanwuApi = pathname === '/api/duanwu' || pathname.startsWith('/api/duanwu/');
+  const isStaticAsset =
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/icons/') ||
+    pathname.includes('.');
+
+  if (!isDuanwuPage && !isDuanwuApi && !isStaticAsset) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/duanwu';
+    redirectUrl.search = searchParams.toString();
+    return NextResponse.redirect(redirectUrl);
+  }
+
   const response = NextResponse.next();
 
   // 自动从 SUB2API_BASE_URL 提取 origin，允许 Sub2API 主站 iframe 嵌入
@@ -50,5 +67,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image).*)'],
 };
