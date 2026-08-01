@@ -7,5 +7,5 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const lang = Array.isArray(params?.lang) ? params?.lang[0] : params?.lang;
-  redirect(lang === 'en' ? '/duanwu?lang=en' : '/duanwu');
+  redirect(lang === 'en' ? '/lottery?lang=en' : '/lottery');
 }

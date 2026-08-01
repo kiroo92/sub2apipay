@@ -14,5 +14,5 @@ export default async function AdminHome({
       qs.set(key, value);
     }
   }
-  redirect(`/admin/duanwu?${qs.toString()}`);
+  redirect(`/admin/lottery?${qs.toString()}`);
 }

@@ -1,5 +1,5 @@
 import { getEnv } from '@/lib/config';
-import type { Sub2ApiPaymentOrder, Sub2ApiUser } from './types';
+import type { Sub2ApiPaymentOrder, Sub2ApiSubscription, Sub2ApiUser } from './types';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const RECHARGE_TIMEOUT_MS = 30_000;
@@ -36,12 +36,20 @@ function normalizePaymentOrder(raw: Record<string, unknown>): Sub2ApiPaymentOrde
   return {
     id: (raw.id as string | number | undefined) ?? String(raw.order_id ?? ''),
     user_id: toNumber(raw.user_id ?? raw.userId ?? (raw.user as { id?: number } | undefined)?.id),
-    user_name: toNullableString(raw.user_name ?? raw.userName ?? (raw.user as { username?: string } | undefined)?.username),
-    user_email: toNullableString(raw.user_email ?? raw.userEmail ?? (raw.user as { email?: string } | undefined)?.email),
-    user_notes: toNullableString(raw.user_notes ?? raw.userNotes ?? (raw.user as { notes?: string } | undefined)?.notes),
+    user_name: toNullableString(
+      raw.user_name ?? raw.userName ?? (raw.user as { username?: string } | undefined)?.username,
+    ),
+    user_email: toNullableString(
+      raw.user_email ?? raw.userEmail ?? (raw.user as { email?: string } | undefined)?.email,
+    ),
+    user_notes: toNullableString(
+      raw.user_notes ?? raw.userNotes ?? (raw.user as { notes?: string } | undefined)?.notes,
+    ),
     amount: toNumber(raw.amount ?? raw.actual_amount ?? raw.pay_amount ?? raw.recharge_amount ?? raw.total_amount),
     status: toNullableString(raw.status),
+    order_type: toNullableString(raw.order_type ?? raw.orderType),
     payment_type: toNullableString(raw.payment_type ?? raw.paymentType ?? raw.channel),
+    refund_amount: toNumber(raw.refund_amount ?? raw.refundAmount),
     created_at: toNullableString(raw.created_at ?? raw.createdAt),
     paid_at: toNullableString(raw.paid_at ?? raw.paidAt ?? raw.payment_at ?? raw.paymentAt ?? raw.completed_at),
   };
@@ -67,6 +75,9 @@ export async function listPaymentOrders(params?: {
   page_size?: number;
   timezone?: string;
   keyword?: string;
+  user_id?: number;
+  status?: string;
+  order_type?: string;
 }): Promise<{ items: Sub2ApiPaymentOrder[]; total: number; page: number; page_size: number }> {
   const env = getEnv();
   const qs = new URLSearchParams();
@@ -74,6 +85,9 @@ export async function listPaymentOrders(params?: {
   qs.set('page_size', String(params?.page_size ?? 100));
   if (params?.timezone) qs.set('timezone', params.timezone);
   if (params?.keyword) qs.set('keyword', params.keyword);
+  if (params?.user_id != null) qs.set('user_id', String(params.user_id));
+  if (params?.status) qs.set('status', params.status);
+  if (params?.order_type) qs.set('order_type', params.order_type);
 
   const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/payment/orders?${qs.toString()}`, {
     headers: getHeaders(),
@@ -95,6 +109,22 @@ export async function listPaymentOrders(params?: {
     page: Number(paginated?.page ?? params?.page ?? 1),
     page_size: Number(paginated?.page_size ?? params?.page_size ?? itemsRaw.length ?? 0),
   };
+}
+
+export async function getUserSubscriptions(userId: number): Promise<Sub2ApiSubscription[]> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/users/${userId}/subscriptions`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (response.status === 404) return [];
+  if (!response.ok) throw new Error(`Failed to get user subscriptions: ${response.status}`);
+
+  const payload = await response.json();
+  const data = payload.data ?? payload;
+  const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  return items as Sub2ApiSubscription[];
 }
 
 export async function addBalance(userId: number, amount: number, notes: string, idempotencyKey: string): Promise<void> {

@@ -1,19 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
 import { getEnv } from '@/lib/config';
 import { resolveLocale } from '@/lib/locale';
 
 export async function verifyAdminToken(request: NextRequest): Promise<boolean> {
-  let token: string | null = null;
-  const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) token = authHeader.slice(7).trim();
-  if (!token) token = request.nextUrl.searchParams.get('token');
+  const authorization = request.headers.get('authorization');
+  const token = authorization?.startsWith('Bearer ')
+    ? authorization.slice(7).trim()
+    : request.nextUrl.searchParams.get('token')?.trim();
   if (!token) return false;
-
   const expected = Buffer.from(getEnv().ADMIN_TOKEN);
   const received = Buffer.from(token);
-  if (expected.length !== received.length) return false;
-  return crypto.timingSafeEqual(expected, received);
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
 export function unauthorizedResponse(request?: NextRequest) {

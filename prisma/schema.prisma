@@ -10,27 +10,34 @@ enum ActivityRewardStatus {
   PENDING
   ISSUED
   ISSUE_FAILED
+  MANUAL_PENDING
+  MANUAL_REDEEMED
+}
+
+enum ActivityPrizeReason {
+  RANDOM
+  HIGH_RECHARGE_GUARANTEE
 }
 
 model ActivityDrawRecord {
-  id                  String               @id @default(cuid())
-  activityKey         String               @map("activity_key")
-  userId              Int                  @map("user_id")
-  rechargeOrderCount  Int                  @default(0) @map("recharge_order_count")
-  totalRechargeAmount Decimal              @db.Decimal(10, 2) @map("total_recharge_amount")
-  prizeKey            String               @map("prize_key")
-  prizeSlot           Int?                 @map("prize_slot")
-  prizeName           String               @map("prize_name")
-  prizeAmount         Decimal              @db.Decimal(10, 2) @map("prize_amount")
-  issueStatus         ActivityRewardStatus @default(PENDING) @map("issue_status")
-  issueError          String?              @db.Text @map("issue_error")
-  issuedAt            DateTime?            @map("issued_at")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
+  id          String               @id @default(cuid())
+  activityKey String               @map("activity_key")
+  userId      Int                  @map("user_id")
+  requestId   String               @map("request_id")
+  drawIndex   Int                  @map("draw_index")
+  prizeKey    String               @map("prize_key")
+  prizeAmount Decimal              @map("prize_amount") @db.Decimal(10, 2)
+  prizeReason ActivityPrizeReason  @default(RANDOM) @map("prize_reason")
+  issueStatus ActivityRewardStatus @default(PENDING) @map("issue_status")
+  issueError  String?              @map("issue_error") @db.Text
+  issuedAt    DateTime?            @map("issued_at")
+  adminNote   String?              @map("admin_note") @db.Text
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
 
-  @@unique([activityKey, userId])
-  @@unique([activityKey, prizeKey, prizeSlot])
-  @@index([activityKey, userId])
+  @@unique([activityKey, userId, requestId])
+  @@unique([activityKey, userId, drawIndex])
+  @@index([activityKey, issueStatus])
   @@index([userId, createdAt])
   @@map("activity_draw_records")
 }

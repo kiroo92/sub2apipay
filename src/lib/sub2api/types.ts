@@ -15,7 +15,18 @@ export interface Sub2ApiPaymentOrder {
   user_notes?: string | null;
   amount: number;
   status?: string | null;
+  order_type?: string | null;
   payment_type?: string | null;
+  refund_amount: number;
   created_at?: string | null;
   paid_at?: string | null;
+}
+
+export interface Sub2ApiSubscription {
+  id: number;
+  user_id: number;
+  group_id: number;
+  starts_at: string;
+  expires_at: string;
+  status: string;
 }

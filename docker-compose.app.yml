@@ -1,18 +1,47 @@
-# docker-compose.app.yml
-# 使用 GHCR 镜像部署（仅应用，外部数据库）
-# 适合：已有 PostgreSQL 实例，将 DATABASE_URL 填入 .env
-#
-# 启动：IMAGE_TAG=1.0.0 docker compose -f docker-compose.app.yml up -d
-# 更新：IMAGE_TAG=1.1.0 docker compose -f docker-compose.app.yml pull && docker compose -f docker-compose.app.yml up -d
-# 不指定 IMAGE_TAG 时默认使用 latest
+name: sub2apipay
 
+# Published image with an external PostgreSQL database from DATABASE_URL.
 services:
   app:
-    image: ghcr.io/kiroo92/sub2apipay:${IMAGE_TAG:-latest}
+    image: ${APP_IMAGE:-ghcr.io/kiroo92/sub2apipay}:${IMAGE_TAG:-latest}
+    pull_policy: always
     ports:
-      - '${APP_PORT:-3001}:3000'
-    env_file: .env
-    volumes:
-      # 宿主机 uploads 目录挂载到 Next.js public/uploads，可通过 /uploads/* 访问
-      - ./uploads:/app/public/uploads:ro
+      - '${APP_HOST:-127.0.0.1}:${APP_PORT:-3001}:3000'
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      SUB2API_BASE_URL: ${SUB2API_BASE_URL:?Set SUB2API_BASE_URL in .env}
+      SUB2API_ADMIN_API_KEY: ${SUB2API_ADMIN_API_KEY:?Set SUB2API_ADMIN_API_KEY in .env}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN in .env}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in .env}
+      LOTTERY_START_AT: '${LOTTERY_START_AT:-2026-08-01T00:00:00+08:00}'
+      LOTTERY_END_AT: '${LOTTERY_END_AT:-2026-09-01T00:00:00+08:00}'
+      LOTTERY_ADMIN_CONTACT: ${LOTTERY_ADMIN_CONTACT:-support@example.com}
+      LOTTERY_VOUCHER_REDEMPTION_DAYS: ${LOTTERY_VOUCHER_REDEMPTION_DAYS:-7}
+      HOSTNAME: 0.0.0.0
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-3}

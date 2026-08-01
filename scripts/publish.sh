@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # scripts/publish.sh
-# 构建并发布 Docker 镜像到 Docker Hub
-# 在构建服务器（us-asaki-root）上运行
+# 构建并发布 Docker 镜像到 GHCR
 #
 # 发布流程：
 #   1. 本地开发完成后打 tag：git tag v1.2.3 && git push origin v1.2.3
@@ -15,7 +14,7 @@
 
 set -euo pipefail
 
-REGISTRY="touwaeriol/sub2apipay"
+REGISTRY="${REGISTRY:-ghcr.io/kiroo92/sub2apipay}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -46,15 +45,13 @@ echo ""
 
 # ── 1. 构建 ────────────────────────────────────────────────────────────────
 echo "[1/3] 构建镜像..."
-docker compose build
+docker build -t "$REGISTRY:$VERSION" -t "$REGISTRY:latest" .
 
 # ── 2. 打标签 ──────────────────────────────────────────────────────────────
-echo "[2/3] 打标签: $VERSION 和 latest..."
-docker tag sub2apipay-app:latest "$REGISTRY:$VERSION"
-docker tag sub2apipay-app:latest "$REGISTRY:latest"
+echo "[2/3] 已生成标签: $VERSION 和 latest"
 
 # ── 3. 推送 ────────────────────────────────────────────────────────────────
-echo "[3/3] 推送到 Docker Hub..."
+echo "[3/3] 推送到 GHCR..."
 docker push "$REGISTRY:$VERSION"
 docker push "$REGISTRY:latest"
 
