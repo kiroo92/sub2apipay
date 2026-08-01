@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
-  SUB2API_BASE_URL: z.string().url(),
+  SUB2API_BASE_URL: z
+    .string()
+    .url()
+    .transform((value) => value.replace(/\/+$/, '')),
   SUB2API_ADMIN_API_KEY: z.string().min(1),
   ADMIN_TOKEN: z.string().min(16),
   NEXT_PUBLIC_APP_URL: z.string().url(),

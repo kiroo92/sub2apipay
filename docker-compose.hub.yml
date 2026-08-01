@@ -6,7 +6,7 @@ services:
     image: ${APP_IMAGE:-ghcr.io/kiroo92/sub2apipay}:${IMAGE_TAG:-latest}
     pull_policy: always
     ports:
-      - '${APP_HOST:-127.0.0.1}:${APP_PORT:-3001}:3000'
+      - '${APP_HOST:-127.0.0.1}:${APP_PORT:-4001}:3000'
     environment:
       DATABASE_URL: postgresql://sub2apipay:${DB_PASSWORD:?Set DB_PASSWORD in .env}@db:5432/sub2apipay
       SUB2API_BASE_URL: ${SUB2API_BASE_URL:?Set SUB2API_BASE_URL in .env}
