@@ -9,16 +9,20 @@ vi.mock('@/lib/db', () => ({ prisma: { activityDrawRecord: { findUnique: mocks.f
 vi.mock('@/lib/sub2api/client', () => ({
   addBalance: vi.fn(),
   getUserSubscriptions: vi.fn(),
+  getUserUsageStats: vi.fn(),
   listPaymentOrders: mocks.listPaymentOrders,
+  listSubscriptionPlans: vi.fn(),
 }));
 import {
   buildEligiblePrizePool,
-  calculateEarnedDraws,
+  calculateEarnedCards,
+  countUsedCards,
   drawLotteryPrize,
-  filterValidRechargeOrders,
-  LOTTERY_GUARANTEE_START_AT,
+  filterValidOrders,
+  isGiftMonthPlan,
+  LOTTERY_POOL_SIZE,
+  LOTTERY_PRIZES,
   pickWeightedPrize,
-  shouldGuaranteeFifty,
 } from '@/lib/activity/lottery';
 import type { Sub2ApiPaymentOrder } from '@/lib/sub2api/types';
 
@@ -37,16 +41,17 @@ const baseOrder: Sub2ApiPaymentOrder = {
 describe('lottery rules', () => {
   beforeEach(() => vi.clearAllMocks());
   it.each([
-    [0, 0],
-    [19.99, 0],
-    [20, 1],
-    [99.99, 1],
-    [100, 2],
-    [199.99, 2],
-    [200, 3],
-    [9999, 3],
-  ])('maps recharge %d to %d earned draws', (amount, expected) => {
-    expect(calculateEarnedDraws(amount)).toBe(expected);
+    [{ monthlyPurchases: 0, packageUsageAmount: 2399.99, balanceUsageAmount: 1999.99 }, 0],
+    [{ monthlyPurchases: 1, packageUsageAmount: 2400, balanceUsageAmount: 2000 }, 3],
+    [{ monthlyPurchases: 4, packageUsageAmount: 7200, balanceUsageAmount: 6000 }, 10],
+    [{ monthlyPurchases: 20, packageUsageAmount: 24_000, balanceUsageAmount: 20_000 }, 40],
+  ])('calculates repeatable cards without a maximum', (input, expected) => {
+    expect(calculateEarnedCards(input).total).toBe(expected);
+  });
+
+  it('keeps the configured inventory fixed and does not consume a card for redraws', () => {
+    expect(LOTTERY_PRIZES.reduce((sum, prize) => sum + prize.initialStock, 0)).toBe(LOTTERY_POOL_SIZE);
+    expect(countUsedCards(['balance_30', 'redraw', 'balance_60', 'redraw'])).toBe(2);
   });
 
   it('accepts only completed, unrefunded balance orders in the requested window', () => {
@@ -59,43 +64,66 @@ describe('lottery rules', () => {
     ];
 
     expect(
-      filterValidRechargeOrders(
+      filterValidOrders(
         orders,
         7,
+        'balance',
         new Date('2026-08-01T00:00:00.000Z'),
         new Date('2026-09-01T00:00:00.000Z'),
       ).map((order) => order.id),
     ).toEqual(['order-1']);
   });
 
-  it('removes reset voucher for users without an active subscription and moves its weight to five yuan', () => {
-    const pool = buildEligiblePrizePool(false);
-    expect(pool.find((prize) => prize.key === 'subscription_reset')).toBeUndefined();
-    expect(pool.find((prize) => prize.key === 'balance_5')?.weight).toBe(7501);
-    expect(pool.reduce((sum, prize) => sum + prize.weight, 0)).toBe(10_000);
+  it('recognizes named 30-day month cards', () => {
+    expect(
+      isGiftMonthPlan({
+        id: 1,
+        group_id: 2,
+        name: 'Codex 轻享月卡',
+        product_name: '',
+        validity_days: 30,
+        validity_unit: 'day',
+      }),
+    ).toBe(true);
+    expect(
+      isGiftMonthPlan({
+        id: 2,
+        group_id: 3,
+        name: '普通季卡',
+        product_name: '',
+        validity_days: 90,
+        validity_unit: 'day',
+      }),
+    ).toBe(false);
   });
 
-  it('keeps the full prize pool for subscribed users', () => {
-    const pool = buildEligiblePrizePool(true);
-    expect(pool.find((prize) => prize.key === 'subscription_reset')?.weight).toBe(1);
-    expect(pool.reduce((sum, prize) => sum + prize.weight, 0)).toBe(10_000);
+  it('removes reset prizes for users without an active subscription', () => {
+    const pool = buildEligiblePrizePool({ hasActiveSubscription: false, priorPrizeKeys: [] });
+    expect(pool.find((prize) => prize.key === 'quota_reset')).toBeUndefined();
+    expect(pool.reduce((sum, prize) => sum + prize.initialStock, 0)).toBe(9_990);
+  });
+
+  it('removes every grand prize after the user has won one', () => {
+    const pool = buildEligiblePrizePool({ hasActiveSubscription: true, priorPrizeKeys: ['balance_240'] });
+    expect(pool.find((prize) => prize.key === 'balance_240')).toBeUndefined();
+    expect(pool.find((prize) => prize.key === 'quota_reset')).toBeUndefined();
+  });
+
+  it('removes prizes whose global inventory is exhausted', () => {
+    const pool = buildEligiblePrizePool({
+      hasActiveSubscription: true,
+      priorPrizeKeys: [],
+      awardedByPrize: { balance_240: 100, quota_reset: 10 },
+    });
+    expect(pool.find((prize) => prize.key === 'balance_240')).toBeUndefined();
+    expect(pool.find((prize) => prize.key === 'quota_reset')).toBeUndefined();
   });
 
   it('selects prizes by integer weight boundaries', () => {
-    const pool = buildEligiblePrizePool(true);
-    expect(pickWeightedPrize(pool, 0).key).toBe('balance_2');
-    expect(pickWeightedPrize(pool, 2_000).key).toBe('balance_5');
-    expect(pickWeightedPrize(pool, 9_999).key).toBe('subscription_reset');
-  });
-
-  it('guarantees fifty only above 1000 and only before a previous fifty', () => {
-    expect(shouldGuaranteeFifty(1000, [])).toBe(false);
-    expect(shouldGuaranteeFifty(1000.01, [])).toBe(true);
-    expect(shouldGuaranteeFifty(1200, ['balance_50'])).toBe(false);
-  });
-
-  it('starts the high-recharge guarantee window at August 1 in Shanghai', () => {
-    expect(new Date(LOTTERY_GUARANTEE_START_AT).toISOString()).toBe('2026-07-31T16:00:00.000Z');
+    const pool = buildEligiblePrizePool({ hasActiveSubscription: true, priorPrizeKeys: [] });
+    expect(pickWeightedPrize(pool, 0).key).toBe('balance_30');
+    expect(pickWeightedPrize(pool, 4_800).key).toBe('balance_60');
+    expect(pickWeightedPrize(pool, 9_999).key).toBe('quota_reset');
   });
 
   it('returns the original result for a replay without querying eligibility again', async () => {

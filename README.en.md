@@ -1,14 +1,15 @@
 # Sub2ApiPay Activity Service
 
-A recharge lottery service for Sub2API users. It provides the user lottery page, server-side prize selection, automatic balance rewards, manual subscription-reset voucher redemption, and an admin dashboard.
+A shake-card reward service for Sub2API users. It grants cards from qualifying monthly-plan purchases and Codex usage, with server-side inventory, automatic balance rewards, manual quota-reset redemption, and an admin dashboard.
 
 ## Features
 
 - Authenticate users with their Sub2API token
-- Grant draw attempts from valid recharge orders in the activity window
-- Weighted server-side prize selection with at most three draws
+- Grant repeatable cards from monthly-plan purchases and qualifying usage
+- Finite server-side prize inventory with no per-user draw ceiling
+- Limit each user to one grand-prize-group reward
 - Idempotent balance rewards with retry support
-- Manual subscription-reset voucher redemption
+- Manual quota-reset reward redemption
 - Admin statistics, filtering, and reward operations
 
 See [docs/activity-lottery.md](docs/activity-lottery.md) for the full rules.
@@ -109,7 +110,7 @@ docker compose -f docker-compose.hub.yml exec -T db \
 | Route                               | Purpose                                 |
 | ----------------------------------- | --------------------------------------- |
 | `/lottery?token=USER_TOKEN`         | User lottery page                       |
-| `/admin/lottery?token=ADMIN_TOKEN`  | Admin dashboard                         |
+| `/admin/lottery`                    | Admin sign-in and dashboard             |
 | `GET /api/lottery?token=USER_TOKEN` | User activity state                     |
 | `POST /api/lottery/draw`            | Perform a draw                          |
 | `GET /api/admin/lottery`            | Admin records and statistics            |

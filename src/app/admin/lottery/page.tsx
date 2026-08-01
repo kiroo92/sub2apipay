@@ -3,6 +3,8 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+const ADMIN_SESSION_KEY = 'sub2apipay.admin-token';
+
 interface AdminRecord {
   id: string;
   userId: number;
@@ -14,8 +16,14 @@ interface AdminRecord {
   createdAt: string;
 }
 interface AdminData {
-  summary: { totalDraws: number; issuedAmount: number; guaranteeCount: number };
-  prizeStats: Array<{ prizeKey: string; count: number; totalAmount: number }>;
+  summary: { totalDraws: number; issuedAmount: number; grandPrizeUsers: number };
+  prizeStats: Array<{
+    prizeKey: string;
+    count: number;
+    totalAmount: number;
+    initialStock: number;
+    remainingStock: number;
+  }>;
   issueStats: Array<{ issueStatus: string; count: number }>;
   records: AdminRecord[];
   total: number;
@@ -24,6 +32,12 @@ interface AdminData {
 }
 
 const PRIZE_NAMES: Record<string, string> = {
+  balance_30: '$30 额度',
+  balance_60: '$60 额度',
+  balance_120: '$120 额度',
+  balance_240: '$240 额度',
+  redraw: '再摇一次',
+  quota_reset: '免费重置额度',
   balance_2: '¥2 余额',
   balance_5: '¥5 余额',
   balance_10: '¥10 余额',
@@ -41,23 +55,46 @@ const STATUS_NAMES: Record<string, string> = {
 
 function AdminLotteryContent() {
   const searchParams = useSearchParams();
-  const token = searchParams.get('token') || '';
+  const urlToken = searchParams.get('token') || '';
+  const [token, setToken] = useState(urlToken);
+  const [tokenInput, setTokenInput] = useState(urlToken);
+  const [ready, setReady] = useState(false);
   const [data, setData] = useState<AdminData | null>(null);
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
 
+  useEffect(() => {
+    const stored = window.sessionStorage.getItem(ADMIN_SESSION_KEY) || '';
+    const selected = urlToken || stored;
+    setToken(selected);
+    setTokenInput(selected);
+    if (urlToken) {
+      window.sessionStorage.setItem(ADMIN_SESSION_KEY, urlToken);
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('token');
+      window.history.replaceState({}, '', cleanUrl);
+    }
+    setReady(true);
+  }, [urlToken]);
+
   const load = useCallback(async () => {
     if (!token) {
-      setError('缺少管理员 token');
       return;
     }
-    const params = new URLSearchParams({ token, page: String(page), page_size: '20' });
+    const params = new URLSearchParams({ page: String(page), page_size: '20' });
     if (status) params.set('issueStatus', status);
     try {
-      const response = await fetch(`/api/admin/lottery?${params}`, { cache: 'no-store' });
+      const response = await fetch(`/api/admin/lottery?${params}`, {
+        cache: 'no-store',
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const payload = await response.json();
+      if (response.status === 401) {
+        window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
+        setToken('');
+      }
       if (!response.ok) throw new Error(payload.error || '管理数据加载失败');
       setData(payload);
       setError('');
@@ -78,9 +115,9 @@ function AdminLotteryContent() {
     }
     setBusyId(record.id);
     try {
-      const response = await fetch(`/api/admin/lottery?token=${encodeURIComponent(token)}`, {
+      const response = await fetch('/api/admin/lottery', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ action, drawId: record.id, note }),
       });
       const payload = await response.json();
@@ -93,6 +130,51 @@ function AdminLotteryContent() {
     }
   };
 
+  const login = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextToken = tokenInput.trim();
+    if (!nextToken) {
+      setError('请输入管理员口令');
+      return;
+    }
+    window.sessionStorage.setItem(ADMIN_SESSION_KEY, nextToken);
+    setError('');
+    setToken(nextToken);
+  };
+
+  const logout = () => {
+    window.sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    setToken('');
+    setTokenInput('');
+    setData(null);
+    setError('');
+  };
+
+  if (!ready) return <main className="admin-lottery">加载管理入口...</main>;
+
+  if (!token) {
+    return (
+      <main className="admin-login">
+        <form className="admin-login__panel" onSubmit={login}>
+          <span>ACTIVITY OPS</span>
+          <h1>管理员登录</h1>
+          <p>输入活动后台口令</p>
+          {error ? <div className="admin-error">{error}</div> : null}
+          <label htmlFor="admin-token">管理员口令</label>
+          <input
+            id="admin-token"
+            type="password"
+            autoComplete="current-password"
+            value={tokenInput}
+            onChange={(event) => setTokenInput(event.target.value)}
+            autoFocus
+          />
+          <button type="submit">进入控制台</button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <main className="admin-lottery">
       <header className="admin-lottery__header">
@@ -100,9 +182,14 @@ function AdminLotteryContent() {
           <span>ACTIVITY OPS</span>
           <h1>大转盘控制台</h1>
         </div>
-        <button type="button" onClick={() => void load()}>
-          刷新数据
-        </button>
+        <div className="admin-lottery__actions">
+          <button type="button" onClick={() => void load()}>
+            刷新数据
+          </button>
+          <button type="button" onClick={logout}>
+            退出
+          </button>
+        </div>
       </header>
       {error ? <div className="admin-error">{error}</div> : null}
       {data ? (
@@ -114,11 +201,11 @@ function AdminLotteryContent() {
             </div>
             <div>
               <span>已发余额</span>
-              <strong>¥{data.summary.issuedAmount.toFixed(2)}</strong>
+              <strong>${data.summary.issuedAmount.toFixed(2)}</strong>
             </div>
             <div>
-              <span>¥50 保底</span>
-              <strong>{data.summary.guaranteeCount}</strong>
+              <span>大奖用户</span>
+              <strong>{data.summary.grandPrizeUsers}</strong>
             </div>
             <div>
               <span>人工待处理</span>
@@ -130,7 +217,7 @@ function AdminLotteryContent() {
               <div key={item.prizeKey}>
                 <b>{PRIZE_NAMES[item.prizeKey] ?? item.prizeKey}</b>
                 <span>
-                  {item.count} 次 / ¥{item.totalAmount.toFixed(2)}
+                  已发 {item.count} / 剩余 {item.remainingStock}
                 </span>
               </div>
             ))}
@@ -174,9 +261,9 @@ function AdminLotteryContent() {
                 </div>
                 <div>
                   <strong>{PRIZE_NAMES[record.prizeKey] ?? record.prizeKey}</strong>
-                  <small>¥{record.prizeAmount.toFixed(2)}</small>
+                  <small>${record.prizeAmount.toFixed(2)}</small>
                 </div>
-                <span>{record.prizeReason === 'HIGH_RECHARGE_GUARANTEE' ? '高充值保底' : '随机奖池'}</span>
+                <span>{record.prizeReason === 'HIGH_RECHARGE_GUARANTEE' ? '历史保底' : '库存奖池'}</span>
                 <span className={`admin-status admin-status--${record.issueStatus.toLowerCase()}`}>
                   {STATUS_NAMES[record.issueStatus] ?? record.issueStatus}
                 </span>

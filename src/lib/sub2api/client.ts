@@ -1,5 +1,11 @@
 import { getEnv } from '@/lib/config';
-import type { Sub2ApiPaymentOrder, Sub2ApiSubscription, Sub2ApiUser } from './types';
+import type {
+  Sub2ApiPaymentOrder,
+  Sub2ApiSubscription,
+  Sub2ApiSubscriptionPlan,
+  Sub2ApiUsageStats,
+  Sub2ApiUser,
+} from './types';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const RECHARGE_TIMEOUT_MS = 30_000;
@@ -48,10 +54,74 @@ function normalizePaymentOrder(raw: Record<string, unknown>): Sub2ApiPaymentOrde
     amount: toNumber(raw.amount ?? raw.actual_amount ?? raw.pay_amount ?? raw.recharge_amount ?? raw.total_amount),
     status: toNullableString(raw.status),
     order_type: toNullableString(raw.order_type ?? raw.orderType),
+    plan_id: raw.plan_id == null && raw.planId == null ? null : toNumber(raw.plan_id ?? raw.planId),
+    subscription_group_id:
+      raw.subscription_group_id == null && raw.subscriptionGroupId == null
+        ? null
+        : toNumber(raw.subscription_group_id ?? raw.subscriptionGroupId),
+    subscription_days:
+      raw.subscription_days == null && raw.subscriptionDays == null
+        ? null
+        : toNumber(raw.subscription_days ?? raw.subscriptionDays),
     payment_type: toNullableString(raw.payment_type ?? raw.paymentType ?? raw.channel),
     refund_amount: toNumber(raw.refund_amount ?? raw.refundAmount),
     created_at: toNullableString(raw.created_at ?? raw.createdAt),
     paid_at: toNullableString(raw.paid_at ?? raw.paidAt ?? raw.payment_at ?? raw.paymentAt ?? raw.completed_at),
+  };
+}
+
+export async function listSubscriptionPlans(): Promise<Sub2ApiSubscriptionPlan[]> {
+  const env = getEnv();
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/payment/plans`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) throw new Error(`Failed to list subscription plans: ${response.status}`);
+  const payload = await response.json();
+  const data = payload.data ?? payload;
+  const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  return items.map((raw: Record<string, unknown>) => ({
+    id: toNumber(raw.id),
+    group_id: toNumber(raw.group_id ?? raw.groupId),
+    name: String(raw.name ?? ''),
+    product_name: toNullableString(raw.product_name ?? raw.productName),
+    validity_days: toNumber(raw.validity_days ?? raw.validityDays),
+    validity_unit: String(raw.validity_unit ?? raw.validityUnit ?? 'day'),
+  }));
+}
+
+export async function getUserUsageStats(params: {
+  user_id: number;
+  billing_type: 0 | 1;
+  start_date: string;
+  end_date: string;
+  timezone: string;
+  group_id?: number;
+}): Promise<Sub2ApiUsageStats> {
+  const env = getEnv();
+  const qs = new URLSearchParams({
+    user_id: String(params.user_id),
+    billing_type: String(params.billing_type),
+    start_date: params.start_date,
+    end_date: params.end_date,
+    timezone: params.timezone,
+    nocache: 'true',
+  });
+  if (params.group_id != null) qs.set('group_id', String(params.group_id));
+
+  const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/usage/stats?${qs.toString()}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`Failed to get user usage stats: ${response.status}`);
+
+  const payload = await response.json();
+  const data = payload.data ?? payload;
+  return {
+    total_requests: toNumber(data?.total_requests),
+    total_cost: toNumber(data?.total_cost),
+    total_actual_cost: toNumber(data?.total_actual_cost),
   };
 }
 

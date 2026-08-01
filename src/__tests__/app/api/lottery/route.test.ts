@@ -37,10 +37,10 @@ describe('lottery API', () => {
   });
 
   it('returns live activity data for the authenticated user', async () => {
-    getLotteryActivityData.mockResolvedValue({ stats: { availableDraws: 2 }, drawRecords: [] });
+    getLotteryActivityData.mockResolvedValue({ stats: { availableCards: 2 }, drawRecords: [] });
     const response = await GET(new NextRequest('https://activity.example.com/api/lottery?token=TOKEN'));
     expect(response.status).toBe(200);
-    expect((await response.json()).stats.availableDraws).toBe(2);
+    expect((await response.json()).stats.availableCards).toBe(2);
   });
 
   it('requires both token and request ID for a draw', async () => {

@@ -1,14 +1,15 @@
 # Sub2ApiPay 活动服务
 
-面向 Sub2API 用户的充值抽奖活动服务。当前活动为 2026 年 8 月充值幸运大转盘，提供用户抽奖页、服务端奖池、余额自动发放、套餐重置券人工核销和管理后台。
+面向 Sub2API 用户的摇摇卡活动服务。系统按月卡购买和 Codex 消费进度持续发卡，提供用户摇奖页、有限库存奖池、额度自动发放、重置奖励人工核销和管理后台。
 
 ## 功能
 
 - 使用 Sub2API 登录 token 获取当前用户
-- 按活动期有效余额充值累计抽奖次数
-- 服务端加权随机抽奖，最多三次
+- 月卡购买直接赠卡，套餐与余额消费达标后持续赠卡
+- 服务端有限库存抽奖，无用户总次数上限
+- 同一用户至多获得一次大奖组奖励
 - 余额奖励幂等发放及失败重试
-- 套餐重置券人工核销
+- 免费重置额度人工核销
 - 管理后台统计、筛选和发奖处理
 
 详细规则见 [docs/activity-lottery.md](docs/activity-lottery.md)。
@@ -132,7 +133,7 @@ docker compose -f docker-compose.hub.yml exec -T db \
 | 地址                                | 用途                   |
 | ----------------------------------- | ---------------------- |
 | `/lottery?token=USER_TOKEN`         | 用户抽奖页             |
-| `/admin/lottery?token=ADMIN_TOKEN`  | 管理后台               |
+| `/admin/lottery`                    | 管理后台登录入口       |
 | `GET /api/lottery?token=USER_TOKEN` | 用户活动状态           |
 | `POST /api/lottery/draw`            | 执行抽奖               |
 | `GET /api/admin/lottery`            | 管理记录与统计         |

@@ -5,6 +5,7 @@ import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
 import {
   ActivityError,
   LOTTERY_ACTIVITY_KEY,
+  LOTTERY_PRIZES,
   markLotteryVoucherRedeemed,
   retryLotteryIssue,
 } from '@/lib/activity/lottery';
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   const statuses: ActivityRewardStatus[] = ['PENDING', 'ISSUED', 'ISSUE_FAILED', 'MANUAL_PENDING', 'MANUAL_REDEEMED'];
   const issueStatus = requestedStatus && statuses.includes(requestedStatus) ? requestedStatus : undefined;
   const where = { activityKey: LOTTERY_ACTIVITY_KEY, ...(issueStatus ? { issueStatus } : {}) };
-  const [records, total, prizeStats, issueStats, guaranteeCount, issuedTotals] = await Promise.all([
+  const [records, total, prizeGroups, issueStats, grandPrizeUsers, issuedTotals] = await Promise.all([
     prisma.activityDrawRecord.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -36,25 +37,34 @@ export async function GET(request: NextRequest) {
       where: { activityKey: LOTTERY_ACTIVITY_KEY },
       _count: { _all: true },
     }),
-    prisma.activityDrawRecord.count({
-      where: { activityKey: LOTTERY_ACTIVITY_KEY, prizeReason: 'HIGH_RECHARGE_GUARANTEE' },
+    prisma.activityDrawRecord.findMany({
+      where: { activityKey: LOTTERY_ACTIVITY_KEY, prizeKey: { in: ['balance_240', 'quota_reset', 'balance_50'] } },
+      select: { userId: true },
+      distinct: ['userId'],
     }),
     prisma.activityDrawRecord.aggregate({
       where: { activityKey: LOTTERY_ACTIVITY_KEY, issueStatus: 'ISSUED' },
       _sum: { prizeAmount: true },
     }),
   ]);
+  const groupedByPrize = Object.fromEntries(prizeGroups.map((item) => [item.prizeKey, item]));
   return NextResponse.json({
     summary: {
-      totalDraws: prizeStats.reduce((sum, item) => sum + item._count._all, 0),
+      totalDraws: prizeGroups.reduce((sum, item) => sum + item._count._all, 0),
       issuedAmount: Number(issuedTotals._sum.prizeAmount ?? 0),
-      guaranteeCount,
+      grandPrizeUsers: grandPrizeUsers.length,
     },
-    prizeStats: prizeStats.map((item) => ({
-      prizeKey: item.prizeKey,
-      count: item._count._all,
-      totalAmount: Number(item._sum.prizeAmount ?? 0),
-    })),
+    prizeStats: LOTTERY_PRIZES.map((prize) => {
+      const item = groupedByPrize[prize.key];
+      const count = item?._count._all ?? 0;
+      return {
+        prizeKey: prize.key,
+        count,
+        totalAmount: Number(item?._sum.prizeAmount ?? 0),
+        initialStock: prize.initialStock,
+        remainingStock: Math.max(0, prize.initialStock - count),
+      };
+    }),
     issueStats: issueStats.map((item) => ({ issueStatus: item.issueStatus, count: item._count._all })),
     records: records.map((record) => ({ ...record, prizeAmount: Number(record.prizeAmount), issueError: undefined })),
     page,
