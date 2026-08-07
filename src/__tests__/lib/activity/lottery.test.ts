@@ -88,7 +88,7 @@ describe('lottery rules', () => {
   it('removes reset prizes for users without an active subscription', () => {
     const pool = buildEligiblePrizePool({ hasActiveSubscription: false, priorPrizeKeys: [] });
     expect(pool.find((prize) => prize.key === 'quota_reset')).toBeUndefined();
-    expect(pool.reduce((sum, prize) => sum + prize.weight, 0)).toBe(995);
+    expect(pool.reduce((sum, prize) => sum + prize.weight, 0)).toBe(9_995);
   });
 
   it('removes every grand prize after the user has won one', () => {
@@ -111,8 +111,12 @@ describe('lottery rules', () => {
   it('selects prizes by integer weight boundaries', () => {
     const pool = buildEligiblePrizePool({ hasActiveSubscription: true, priorPrizeKeys: [] });
     expect(pickWeightedPrize(pool, 0).key).toBe('balance_2');
-    expect(pickWeightedPrize(pool, 550).key).toBe('balance_5');
-    expect(pickWeightedPrize(pool, 999).key).toBe('quota_reset');
+    expect(pickWeightedPrize(pool, 5_910).key).toBe('balance_5');
+    expect(pickWeightedPrize(pool, 8_910).key).toBe('balance_10');
+    expect(pickWeightedPrize(pool, 9_910).key).toBe('balance_20');
+    expect(pickWeightedPrize(pool, 9_990).key).toBe('balance_50');
+    expect(pickWeightedPrize(pool, 9_995).key).toBe('quota_reset');
+    expect(pickWeightedPrize(pool, 9_999).key).toBe('quota_reset');
   });
 
   it('returns the original result for a replay without querying eligibility again', async () => {
