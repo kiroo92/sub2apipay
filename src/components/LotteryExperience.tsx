@@ -170,6 +170,8 @@ export default function LotteryExperience() {
       ? data.activity.firstCardRecharge
       : data.activity.firstCardRecharge + data.stats.earnedCards * data.activity.additionalCardRecharge
     : null;
+  const rechargeNeeded =
+    data && nextThreshold !== null ? Math.max(0, nextThreshold - data.stats.totalRechargeAmount) : 0;
   const canDraw = Boolean(data?.stats.active && data.stats.availableCards > 0 && !spinning);
   const drawLabel = !data?.stats.active
     ? '活动未开放'
@@ -178,7 +180,7 @@ export default function LotteryExperience() {
         ? '正在开奖'
         : '立即摇奖'
       : nextThreshold
-        ? `充值满 $${nextThreshold} 解锁`
+        ? `再充值 ${formatMoney(rechargeNeeded)} 得 1 张`
         : '摇摇卡已用完';
 
   const latestRecords = useMemo(() => [...(data?.drawRecords ?? [])].reverse(), [data?.drawRecords]);
@@ -263,7 +265,7 @@ export default function LotteryExperience() {
                   <span>我的摇摇卡</span>
                   <strong>{data.stats.availableCards}</strong>
                   <small>
-                    已获得 {data.stats.earnedCards} 张 · 已使用 {data.stats.usedCards} 张
+                    累计获得 {data.stats.earnedCards} 张 · 已抽 {data.stats.usedCards} 次
                   </small>
                 </div>
                 <button type="button" onClick={draw} disabled={!canDraw}>
@@ -275,7 +277,7 @@ export default function LotteryExperience() {
                 <div className="shake-section-heading">
                   <div>
                     <span>RECHARGE PROGRESS</span>
-                    <h2>充值解锁摇摇卡</h2>
+                    <h2>活动累计充值</h2>
                   </div>
                   <strong>{formatMoney(data.stats.totalRechargeAmount)}</strong>
                 </div>
@@ -286,21 +288,19 @@ export default function LotteryExperience() {
 
                 <div className="shake-tiers">
                   <div className={data.stats.earnedCards > 0 ? 'is-unlocked' : ''}>
-                    <span>{data.stats.earnedCards > 0 ? '已解锁' : '首张卡'}</span>
-                    <strong>${data.activity.firstCardRecharge}</strong>
-                    <small>获得 1 张摇摇卡</small>
+                    <span>{data.stats.earnedCards > 0 ? '首张已获得' : '首张条件'}</span>
+                    <strong>满 ${data.activity.firstCardRecharge}</strong>
+                    <small>获得 1 张</small>
                   </div>
                   <div className={data.stats.earnedCards > 1 ? 'is-unlocked' : ''}>
-                    <span>{data.stats.earnedCards > 1 ? '持续解锁' : '后续奖励'}</span>
-                    <strong>每 $100</strong>
-                    <small>再获得 1 张，无上限</small>
+                    <span>之后</span>
+                    <strong>每增加 $100</strong>
+                    <small>再获得 1 张</small>
                   </div>
                 </div>
 
                 <p className="shake-recharge__hint">
-                  {nextThreshold
-                    ? `再充值 ${Math.max(0, nextThreshold - data.stats.totalRechargeAmount).toFixed(2)} 即可解锁下一张`
-                    : '充值越多，可用摇摇卡越多'}
+                  {nextThreshold ? `距离下一张还差 ${formatMoney(rechargeNeeded)}` : '已获得当前充值对应的全部摇摇卡'}
                 </p>
               </section>
 
@@ -310,7 +310,8 @@ export default function LotteryExperience() {
                   <li>
                     仅统计从 <strong>8 月 7 日开始</strong>的有效充值订单（已完成且未退款）。
                   </li>
-                  <li>累计充值满 $20 获得 1 张，之后每增加 $100 再获得 1 张。</li>
+                  <li>累计充值达到 $20 获得首张，之后每累计增加 $100 再获得 1 张。</li>
+                  <li>首张摇摇卡仅会抽中 $2 或 $5 额度。</li>
                   <li>订阅重置卡仅对当前有效订阅用户开放，中奖后联系管理员兑换。</li>
                 </ol>
               </section>

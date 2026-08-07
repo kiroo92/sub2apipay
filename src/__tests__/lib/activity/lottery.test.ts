@@ -91,6 +91,17 @@ describe('lottery rules', () => {
     expect(pool.reduce((sum, prize) => sum + prize.weight, 0)).toBe(9_995);
   });
 
+  it('limits the first draw to the $2 and $5 prizes', () => {
+    const pool = buildEligiblePrizePool({
+      hasActiveSubscription: true,
+      priorPrizeKeys: [],
+      firstDrawOnly: true,
+    });
+    expect(pool.map((prize) => prize.key)).toEqual(['balance_2', 'balance_5']);
+    expect(pickWeightedPrize(pool, 0).key).toBe('balance_2');
+    expect(pickWeightedPrize(pool, 5_910).key).toBe('balance_5');
+  });
+
   it('removes every grand prize after the user has won one', () => {
     const pool = buildEligiblePrizePool({ hasActiveSubscription: true, priorPrizeKeys: ['balance_240'] });
     expect(pool.find((prize) => prize.key === 'balance_50')).toBeUndefined();

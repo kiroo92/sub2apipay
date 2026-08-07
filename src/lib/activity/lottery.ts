@@ -147,11 +147,13 @@ export function buildEligiblePrizePool(input: {
   hasActiveSubscription: boolean;
   priorPrizeKeys: string[];
   awardedByPrize?: Readonly<Record<string, number>>;
+  firstDrawOnly?: boolean;
 }): LotteryPrize[] {
   const hasGrandPrize = input.priorPrizeKeys.some(
     (key) => LOTTERY_PRIZES.some((prize) => prize.key === key && prize.grand) || LEGACY_GRAND_PRIZE_KEYS.has(key),
   );
   return LOTTERY_PRIZES.flatMap((prize) => {
+    if (input.firstDrawOnly && prize.key !== 'balance_2' && prize.key !== 'balance_5') return [];
     if (prize.key === 'quota_reset' && !input.hasActiveSubscription) return [];
     if (prize.grand && hasGrandPrize) return [];
     const awarded = input.awardedByPrize?.[prize.key] ?? 0;
@@ -371,7 +373,8 @@ export async function drawLotteryPrize(userId: number, requestId: string, now = 
         _count: { _all: true },
       }),
     ]);
-    if (consumedCardCount(records) >= eligibility.earnedCards) {
+    const usedCards = consumedCardCount(records);
+    if (usedCards >= eligibility.earnedCards) {
       throw new ActivityError('NO_CARD_AVAILABLE', '暂无可用摇摇卡', 409);
     }
 
@@ -381,6 +384,7 @@ export async function drawLotteryPrize(userId: number, requestId: string, now = 
         hasActiveSubscription: eligibility.hasActiveSubscription,
         priorPrizeKeys: records.map((record) => record.prizeKey),
         awardedByPrize,
+        firstDrawOnly: usedCards === 0,
       }),
     );
     const immediate = prize.redraw;
