@@ -73,16 +73,16 @@ function statusText(record: DrawRecord) {
   return '处理中';
 }
 
-async function readApiPayload<T>(response: Response): Promise<T & { error?: string }> {
+async function readApiPayload<T>(response: Response, fallbackError: string): Promise<T & { error?: string }> {
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
   const body = await response.text();
   if (!contentType.includes('json')) {
-    throw new Error(`活动接口响应异常（HTTP ${response.status}）`);
+    throw new Error(fallbackError);
   }
   try {
     return JSON.parse(body) as T & { error?: string };
   } catch {
-    throw new Error(`活动接口响应格式错误（HTTP ${response.status}）`);
+    throw new Error(fallbackError);
   }
 }
 
@@ -105,7 +105,7 @@ export default function LotteryExperience() {
     }
     try {
       const response = await fetch(`/api/lottery?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
-      const payload = await readApiPayload<LotteryData>(response);
+      const payload = await readApiPayload<LotteryData>(response, '活动数据刷新失败');
       if (!response.ok) throw new Error(payload.error || '活动数据刷新失败');
       setData(payload);
       setError('');
@@ -131,7 +131,7 @@ export default function LotteryExperience() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, requestId: crypto.randomUUID() }),
       });
-      const payload = await readApiPayload<DrawRecord>(response);
+      const payload = await readApiPayload<DrawRecord>(response, '摇奖请求处理失败');
       if (!response.ok) throw new Error(payload.error || '摇奖请求处理失败');
       const prizeIndex = Math.max(
         0,
