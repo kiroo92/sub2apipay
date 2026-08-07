@@ -261,6 +261,18 @@ function consumedCardCount(records: ActivityDrawRecord[]): number {
   return countUsedCards(records.map((record) => record.prizeKey));
 }
 
+async function acquireActivityLock(tx: Prisma.TransactionClient, lockKey: string) {
+  // pg_try_advisory_xact_lock returns a scalar, unlike the blocking void function.
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    const result = await tx.$queryRaw<Array<{ locked: boolean }>>`
+      SELECT pg_try_advisory_xact_lock(hashtext(${lockKey})) AS locked
+    `;
+    if (result[0]?.locked) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new ActivityError('LOTTERY_BUSY', '抽奖服务繁忙，请稍后重试', 409);
+}
+
 export async function getLotteryActivityData(userId: number, now = new Date()) {
   const [eligibility, records] = await Promise.all([
     loadEligibility(userId, now),
@@ -339,8 +351,8 @@ export async function drawLotteryPrize(userId: number, requestId: string, now = 
   if (!eligibility.active) throw new ActivityError('ACTIVITY_INACTIVE', '活动当前未开放', 409);
 
   const transactionResult = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${LOTTERY_ACTIVITY_KEY}:pool`}))`;
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${LOTTERY_ACTIVITY_KEY}:${userId}`}))`;
+    await acquireActivityLock(tx, `${LOTTERY_ACTIVITY_KEY}:pool`);
+    await acquireActivityLock(tx, `${LOTTERY_ACTIVITY_KEY}:${userId}`);
     const replay = await tx.activityDrawRecord.findUnique({
       where: {
         activityKey_userId_requestId: { activityKey: LOTTERY_ACTIVITY_KEY, userId, requestId },
