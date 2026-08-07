@@ -307,10 +307,11 @@ export default function LotteryExperience() {
               <section className="shake-rules">
                 <h2>活动说明</h2>
                 <ol>
-                  <li>仅统计活动期内已完成且未退款的余额充值。</li>
+                  <li>
+                    仅统计从 <strong>8 月 7 日开始</strong>的有效充值订单（已完成且未退款）。
+                  </li>
                   <li>累计充值满 $20 获得 1 张，之后每增加 $100 再获得 1 张。</li>
                   <li>订阅重置卡仅对当前有效订阅用户开放，中奖后联系管理员兑换。</li>
-                  <li>普通额度奖持续开放，部分大奖数量有限。</li>
                 </ol>
               </section>
             </aside>
