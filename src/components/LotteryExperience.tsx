@@ -311,7 +311,6 @@ export default function LotteryExperience() {
                     仅统计从 <strong>8 月 7 日开始</strong>的有效充值订单（已完成且未退款）。
                   </li>
                   <li>累计充值达到 $20 获得首张，之后每累计增加 $100 再获得 1 张。</li>
-                  <li>首张摇摇卡仅会抽中 $2 或 $5 额度。</li>
                   <li>订阅重置卡仅对当前有效订阅用户开放，中奖后联系管理员兑换。</li>
                 </ol>
               </section>
