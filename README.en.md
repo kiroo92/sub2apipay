@@ -1,15 +1,15 @@
 # Sub2ApiPay Activity Service
 
-A shake-card reward service for Sub2API users. It grants cards from qualifying monthly-plan purchases and Codex usage, with server-side inventory, automatic balance rewards, manual quota-reset redemption, and an admin dashboard.
+A shake-card reward service for Sub2API users. It continuously unlocks cards from qualifying balance recharges, with a weighted prize pool, automatic balance rewards, manual subscription-reset redemption, and an admin dashboard.
 
 ## Features
 
 - Authenticate users with their Sub2API token
-- Grant repeatable cards from monthly-plan purchases and qualifying usage
-- Finite server-side prize inventory with no per-user draw ceiling
+- Unlock the first card at `$20`, then one more for every additional `$100`
+- Unlimited regular rewards from `$2` to `$20`, with server-side inventory limits for grand prizes
 - Limit each user to one grand-prize-group reward
 - Idempotent balance rewards with retry support
-- Manual quota-reset reward redemption
+- Subscription-reset cards for users with an active subscription, redeemed manually by an administrator
 - Admin statistics, filtering, and reward operations
 
 See [docs/activity-lottery.md](docs/activity-lottery.md) for the full rules.

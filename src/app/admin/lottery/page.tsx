@@ -21,8 +21,8 @@ interface AdminData {
     prizeKey: string;
     count: number;
     totalAmount: number;
-    initialStock: number;
-    remainingStock: number;
+    initialStock: number | null;
+    remainingStock: number | null;
   }>;
   issueStats: Array<{ issueStatus: string; count: number }>;
   records: AdminRecord[];
@@ -37,12 +37,12 @@ const PRIZE_NAMES: Record<string, string> = {
   balance_120: '$120 额度',
   balance_240: '$240 额度',
   redraw: '再摇一次',
-  quota_reset: '免费重置额度',
-  balance_2: '¥2 余额',
-  balance_5: '¥5 余额',
-  balance_10: '¥10 余额',
-  balance_20: '¥20 余额',
-  balance_50: '¥50 余额',
+  quota_reset: '订阅重置卡',
+  balance_2: '$2 额度',
+  balance_5: '$5 额度',
+  balance_10: '$10 额度',
+  balance_20: '$20 额度',
+  balance_50: '$50 额度',
   subscription_reset: '套餐重置券',
 };
 const STATUS_NAMES: Record<string, string> = {
@@ -217,7 +217,7 @@ function AdminLotteryContent() {
               <div key={item.prizeKey}>
                 <b>{PRIZE_NAMES[item.prizeKey] ?? item.prizeKey}</b>
                 <span>
-                  已发 {item.count} / 剩余 {item.remainingStock}
+                  已发 {item.count} / {item.remainingStock === null ? '不限量' : `剩余 ${item.remainingStock}`}
                 </span>
               </div>
             ))}

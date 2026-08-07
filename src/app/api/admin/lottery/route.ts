@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         count,
         totalAmount: Number(item?._sum.prizeAmount ?? 0),
         initialStock: prize.initialStock,
-        remainingStock: Math.max(0, prize.initialStock - count),
+        remainingStock: prize.initialStock === null ? null : Math.max(0, prize.initialStock - count),
       };
     }),
     issueStats: issueStats.map((item) => ({ issueStatus: item.issueStatus, count: item._count._all })),

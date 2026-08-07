@@ -26,35 +26,29 @@ interface LotteryData {
     name: string;
     startAt: string;
     endAt: string;
-    packageUsagePerCard: number;
-    balanceUsagePerCard: number;
+    firstCardRecharge: number;
+    additionalCardRecharge: number;
     adminContact: string;
     voucherRedemptionDays: number;
   };
   stats: {
     active: boolean;
+    totalRechargeAmount: number;
     earnedCards: number;
     usedCards: number;
     availableCards: number;
     hasActiveSubscription: boolean;
-    monthlyPurchases: number;
-    monthlyCards: number;
-    packageUsageAmount: number;
-    packageCards: number;
-    balanceUsageAmount: number;
-    balanceCards: number;
   };
-  pool: { initial: number; awarded: number; remaining: number };
   drawRecords: DrawRecord[];
 }
 
 const WHEEL_PRIZES = [
-  { key: 'balance_30', lines: ['$30', '额度'], icon: '$' },
-  { key: 'balance_60', lines: ['$60', '额度'], icon: '$' },
-  { key: 'balance_120', lines: ['$120', '额度'], icon: '$' },
-  { key: 'balance_240', lines: ['$240', '额度'], icon: '$' },
-  { key: 'redraw', lines: ['再摇', '一次'], icon: '↻' },
-  { key: 'quota_reset', lines: ['免费重置', '额度'], icon: '▤' },
+  { key: 'balance_2', amount: '$2', detail: '额度', className: 'coral' },
+  { key: 'balance_5', amount: '$5', detail: '额度', className: 'cream' },
+  { key: 'balance_10', amount: '$10', detail: '额度', className: 'mint' },
+  { key: 'balance_20', amount: '$20', detail: '额度', className: 'yellow' },
+  { key: 'balance_50', amount: '$50', detail: '大奖', className: 'blue' },
+  { key: 'quota_reset', amount: '订阅重置卡', detail: '联系管理员', className: 'rose' },
 ];
 
 function formatDate(value: string) {
@@ -71,17 +65,12 @@ function formatMoney(value: number) {
 }
 
 function statusText(record: DrawRecord) {
-  if (record.prize.redraw) return '摇摇卡未扣除';
-  if (record.issueStatus === 'ISSUED') return '已发放';
+  if (record.prize.redraw) return '摇摇卡已返还';
+  if (record.issueStatus === 'ISSUED') return '已到账';
   if (record.issueStatus === 'MANUAL_PENDING') return '待兑换';
   if (record.issueStatus === 'MANUAL_REDEEMED') return '已兑换';
   if (record.issueStatus === 'ISSUE_FAILED') return '待补发';
   return '处理中';
-}
-
-function progressValue(current: number, threshold: number) {
-  if (threshold <= 0) return 0;
-  return Math.min(100, ((current % threshold) / threshold) * 100);
 }
 
 export default function LotteryExperience() {
@@ -119,7 +108,7 @@ export default function LotteryExperience() {
   }, [loadData]);
 
   const draw = async () => {
-    if (!data || spinning || data.stats.availableCards <= 0 || data.pool.remaining <= 0) return;
+    if (!data || spinning || data.stats.availableCards <= 0) return;
     setSpinning(true);
     setResult(null);
     setError('');
@@ -147,31 +136,43 @@ export default function LotteryExperience() {
     }
   };
 
-  const packageRemainder = data ? data.stats.packageUsageAmount % data.activity.packageUsagePerCard : 0;
-  const balanceRemainder = data ? data.stats.balanceUsageAmount % data.activity.balanceUsagePerCard : 0;
-  const canDraw = Boolean(data?.stats.active && data.stats.availableCards > 0 && data.pool.remaining > 0 && !spinning);
+  const rechargeProgress = data
+    ? (() => {
+        const { firstCardRecharge, additionalCardRecharge } = data.activity;
+        const previousThreshold =
+          data.stats.earnedCards === 0 ? 0 : firstCardRecharge + (data.stats.earnedCards - 1) * additionalCardRecharge;
+        const nextThreshold =
+          data.stats.earnedCards === 0 ? firstCardRecharge : previousThreshold + additionalCardRecharge;
+        return Math.min(
+          100,
+          Math.max(
+            0,
+            ((data.stats.totalRechargeAmount - previousThreshold) / (nextThreshold - previousThreshold)) * 100,
+          ),
+        );
+      })()
+    : 0;
+  const nextThreshold = data
+    ? data.stats.earnedCards === 0
+      ? data.activity.firstCardRecharge
+      : data.activity.firstCardRecharge + data.stats.earnedCards * data.activity.additionalCardRecharge
+    : null;
+  const canDraw = Boolean(data?.stats.active && data.stats.availableCards > 0 && !spinning);
   const drawLabel = !data?.stats.active
     ? '活动未开放'
-    : data.pool.remaining <= 0
-      ? '奖池已发完'
-      : data.stats.availableCards > 0
-        ? spinning
-          ? '摇奖中'
-          : '摇一摇'
-        : '等待获得摇摇卡';
+    : data.stats.availableCards > 0
+      ? spinning
+        ? '正在开奖'
+        : '立即摇奖'
+      : nextThreshold
+        ? `充值满 $${nextThreshold} 解锁`
+        : '摇摇卡已用完';
 
-  const summaryItems = useMemo(
-    () => [
-      { value: data?.stats.availableCards ?? 0, label: '可用摇摇卡', tone: 'red' },
-      { value: '$30+', label: '额度必得', tone: 'orange' },
-      { value: data?.pool.remaining ?? 0, label: '奖池剩余', tone: 'green' },
-    ],
-    [data],
-  );
+  const latestRecords = useMemo(() => [...(data?.drawRecords ?? [])].reverse(), [data?.drawRecords]);
 
   return (
     <main className={['shake-page', embedded ? 'shake-page--embedded' : ''].join(' ')}>
-      {loading ? <div className="shake-notice">正在核对摇摇卡...</div> : null}
+      {loading ? <div className="shake-notice">正在核对活动资格...</div> : null}
       {error ? (
         <div className="shake-notice shake-notice--error" role="alert">
           {error}
@@ -179,171 +180,159 @@ export default function LotteryExperience() {
       ) : null}
 
       {data ? (
-        <div className="shake-layout">
-          <section className="shake-stage" aria-labelledby="shake-title">
-            <header className="shake-stage__header">
-              <h1 id="shake-title">疯狂摇摇摇</h1>
-              <p>每次转动必得额度，还有大奖等你摇</p>
-            </header>
-
-            <div className="shake-benefits" aria-label="获得摇摇卡的方式">
-              <span>
-                <b>购卡赠送</b>
-                轻享 / 尊享月卡
-              </span>
-              <span>
-                <b>消费赠卡</b>
-                达标自动累计
-              </span>
-              <span>
-                <b>重置福利</b>
-                抽中联系兑换
-              </span>
+        <div className="shake-shell">
+          <header className="shake-topbar">
+            <div className="shake-brand">
+              <span className="shake-brand__mark">S</span>
+              <div>
+                <b>SUB2API</b>
+                <span>八月充值回馈</span>
+              </div>
             </div>
+            <div className="shake-topbar__title">
+              <span>SHAKE &amp; WIN</span>
+              <h1>充值幸运大转盘</h1>
+            </div>
+            <div className="shake-user">
+              <span>{data.user.username}</span>
+              <b>账户余额 {formatMoney(data.user.balance)}</b>
+            </div>
+          </header>
 
-            <div className="shake-wheel-zone">
-              <div className="shake-pointer" aria-hidden="true" />
-              <div className="shake-wheel-frame">
-                <div className="shake-wheel" style={{ transform: `rotate(${rotation}deg)` }}>
-                  {WHEEL_PRIZES.map((prize, index) => (
-                    <span
-                      className="shake-wheel__label"
-                      key={prize.key}
-                      style={{ transform: `rotate(${index * 60 + 30}deg) translateY(-39%)` }}
-                    >
-                      <b style={{ transform: `rotate(-${index * 60 + 30}deg)` }}>
-                        <i>{prize.icon}</i>
-                        {prize.lines.map((line) => (
-                          <em key={line}>{line}</em>
-                        ))}
-                      </b>
-                    </span>
-                  ))}
+          <div className="shake-layout">
+            <section className="shake-stage" aria-labelledby="shake-title">
+              <div className="shake-stage__heading">
+                <div>
+                  <span>每摇必中</span>
+                  <h2 id="shake-title">大奖正在池中</h2>
                 </div>
-                <button className="shake-wheel__button" type="button" onClick={draw} disabled={!canDraw}>
-                  <strong>{spinning ? '摇奖中' : '摇一摇'}</strong>
-                  <small>还有 {data.stats.availableCards} 张</small>
+                <p>最高 $50 额度，订阅用户可抽重置卡</p>
+              </div>
+
+              <div className="shake-wheel-zone">
+                <div className="shake-pointer" aria-hidden="true">
+                  <span />
+                </div>
+                <div className="shake-wheel-frame">
+                  <div className="shake-wheel" style={{ transform: `rotate(${rotation}deg)` }}>
+                    {WHEEL_PRIZES.map((prize, index) => {
+                      const angle = index * 60 + 30;
+                      return (
+                        <span
+                          className={`shake-wheel__label shake-wheel__label--${prize.className}`}
+                          key={prize.key}
+                          style={{ transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-36%)` }}
+                        >
+                          <b style={{ transform: `rotate(-${angle}deg)` }}>
+                            <strong>{prize.amount}</strong>
+                            <small>{prize.detail}</small>
+                          </b>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <button className="shake-wheel__button" type="button" onClick={draw} disabled={!canDraw}>
+                    <strong>{spinning ? '开奖中' : '摇一摇'}</strong>
+                    <small>{data.stats.availableCards} 张可用</small>
+                  </button>
+                </div>
+              </div>
+
+              <div className="shake-stage__foot">
+                <span>100% 中奖</span>
+                <p>$2 额度起步，中奖结果由服务端实时锁定</p>
+              </div>
+            </section>
+
+            <aside className="shake-console">
+              <section className="shake-card-balance">
+                <div>
+                  <span>我的摇摇卡</span>
+                  <strong>{data.stats.availableCards}</strong>
+                  <small>
+                    已获得 {data.stats.earnedCards} 张 · 已使用 {data.stats.usedCards} 张
+                  </small>
+                </div>
+                <button type="button" onClick={draw} disabled={!canDraw}>
+                  {drawLabel}
                 </button>
-              </div>
-            </div>
+              </section>
 
-            <p className="shake-stage__caption">
-              购买轻享 / 尊享月卡赠摇摇卡；非月卡套餐消费 ${data.activity.packageUsagePerCard}、余额消费 $
-              {data.activity.balanceUsagePerCard} 各得一张。
-            </p>
-          </section>
+              <section className="shake-recharge">
+                <div className="shake-section-heading">
+                  <div>
+                    <span>RECHARGE PROGRESS</span>
+                    <h2>充值解锁摇摇卡</h2>
+                  </div>
+                  <strong>{formatMoney(data.stats.totalRechargeAmount)}</strong>
+                </div>
 
-          <aside className="shake-sidebar">
-            <section className="shake-summary">
-              {summaryItems.map((item) => (
-                <div className={`shake-summary__item shake-summary__item--${item.tone}`} key={item.label}>
-                  <strong>{item.value}</strong>
-                  <span>{item.label}</span>
+                <div className="shake-recharge__rail" aria-label={`充值进度 ${rechargeProgress.toFixed(0)}%`}>
+                  <span style={{ width: `${rechargeProgress}%` }} />
                 </div>
-              ))}
-            </section>
 
-            <section className="shake-panel shake-progress-panel">
-              <h2>距离下一张摇摇卡</h2>
-              <div className="shake-progress-item">
-                <div>
-                  <b>轻享 / 尊享月卡</b>
-                  <strong>{data.stats.monthlyCards} 张</strong>
+                <div className="shake-tiers">
+                  <div className={data.stats.earnedCards > 0 ? 'is-unlocked' : ''}>
+                    <span>{data.stats.earnedCards > 0 ? '已解锁' : '首张卡'}</span>
+                    <strong>${data.activity.firstCardRecharge}</strong>
+                    <small>获得 1 张摇摇卡</small>
+                  </div>
+                  <div className={data.stats.earnedCards > 1 ? 'is-unlocked' : ''}>
+                    <span>{data.stats.earnedCards > 1 ? '持续解锁' : '后续奖励'}</span>
+                    <strong>每 $100</strong>
+                    <small>再获得 1 张，无上限</small>
+                  </div>
                 </div>
-                <p>活动期已购买 {data.stats.monthlyPurchases} 次</p>
-                <div className="shake-track">
-                  <span style={{ width: data.stats.monthlyPurchases ? '100%' : '0%' }} />
-                </div>
-                <small>购买成功即得，不设累计上限</small>
-              </div>
-              <div className="shake-progress-item shake-progress-item--gold">
-                <div>
-                  <b>非月卡套餐消费</b>
-                  <strong>
-                    {formatMoney(packageRemainder)} / ${data.activity.packageUsagePerCard}
-                  </strong>
-                </div>
-                <p>
-                  累计 {formatMoney(data.stats.packageUsageAmount)}，已得 {data.stats.packageCards} 张
+
+                <p className="shake-recharge__hint">
+                  {nextThreshold
+                    ? `再充值 ${Math.max(0, nextThreshold - data.stats.totalRechargeAmount).toFixed(2)} 即可解锁下一张`
+                    : '充值越多，可用摇摇卡越多'}
                 </p>
-                <div className="shake-track">
-                  <span
-                    style={{
-                      width: `${progressValue(data.stats.packageUsageAmount, data.activity.packageUsagePerCard)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="shake-progress-item shake-progress-item--mint">
-                <div>
-                  <b>余额消费</b>
-                  <strong>
-                    {formatMoney(balanceRemainder)} / ${data.activity.balanceUsagePerCard}
-                  </strong>
-                </div>
-                <p>
-                  累计 {formatMoney(data.stats.balanceUsageAmount)}，已得 {data.stats.balanceCards} 张
-                </p>
-                <div className="shake-track">
-                  <span
-                    style={{
-                      width: `${progressValue(data.stats.balanceUsageAmount, data.activity.balanceUsagePerCard)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </section>
+              </section>
 
-            <section className="shake-panel shake-card-panel">
-              <div className="shake-panel__heading">
-                <h2>我的摇摇卡</h2>
-                <span>累计获得 {data.stats.earnedCards} 张</span>
-              </div>
-              <button className="shake-primary" type="button" onClick={draw} disabled={!canDraw}>
-                {drawLabel}
-              </button>
-            </section>
-
-            <section className="shake-panel shake-pool-panel">
-              <div className="shake-panel__heading">
-                <h2>奖池进度</h2>
-                <span>
-                  {data.pool.remaining} / {data.pool.initial}
-                </span>
-              </div>
-              <div className="shake-track shake-track--pool">
-                <span style={{ width: `${(data.pool.remaining / Math.max(1, data.pool.initial)) * 100}%` }} />
-              </div>
-            </section>
-          </aside>
+              <section className="shake-rules">
+                <h2>活动说明</h2>
+                <ol>
+                  <li>仅统计活动期内已完成且未退款的余额充值。</li>
+                  <li>累计充值满 $20 获得 1 张，之后每增加 $100 再获得 1 张。</li>
+                  <li>订阅重置卡仅对当前有效订阅用户开放，中奖后联系管理员兑换。</li>
+                  <li>普通额度奖持续开放，部分大奖数量有限。</li>
+                </ol>
+              </section>
+            </aside>
+          </div>
 
           <section className="shake-history">
-            <div className="shake-panel__heading">
-              <h2>摇奖记录</h2>
-              <span>共 {data.drawRecords.length} 条</span>
-            </div>
-            <div className="shake-history__table">
-              <div className="shake-history__head">
-                <span>时间</span>
-                <span>奖品</span>
-                <span>摇摇卡</span>
-                <span>状态</span>
+            <div className="shake-section-heading">
+              <div>
+                <span>MY REWARDS</span>
+                <h2>中奖记录</h2>
               </div>
-              {data.drawRecords.length ? (
-                [...data.drawRecords].reverse().map((record) => (
+              <strong>{latestRecords.length} 条</strong>
+            </div>
+            {latestRecords.length ? (
+              <div className="shake-history__table">
+                <div className="shake-history__head">
+                  <span>时间</span>
+                  <span>奖品</span>
+                  <span>摇奖序号</span>
+                  <span>状态</span>
+                </div>
+                {latestRecords.map((record) => (
                   <article className="shake-history__row" key={record.id}>
                     <time>{formatDate(record.createdAt)}</time>
                     <strong>{record.prize.name}</strong>
-                    <span>{record.prize.redraw ? '未扣除' : `第 ${record.drawIndex} 摇`}</span>
+                    <span>{record.prize.redraw ? '本次未扣卡' : `第 ${record.drawIndex} 摇`}</span>
                     <span className={`shake-status shake-status--${record.issueStatus.toLowerCase()}`}>
                       {statusText(record)}
                     </span>
                   </article>
-                ))
-              ) : (
-                <p className="shake-history__empty">暂无摇奖记录</p>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="shake-history__empty">你的第一份奖励还在转盘里</div>
+            )}
           </section>
         </div>
       ) : null}
@@ -357,7 +346,7 @@ export default function LotteryExperience() {
             aria-label="关闭中奖结果"
           />
           <section className="shake-result__content">
-            <span>本次摇中</span>
+            <span>CONGRATULATIONS</span>
             <h2 id="shake-result-title">{result.prize.name}</h2>
             <p>
               {result.prize.redraw

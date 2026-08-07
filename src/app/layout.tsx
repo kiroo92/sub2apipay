@@ -3,8 +3,8 @@ import { headers } from 'next/headers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Sub2API 疯狂摇摇摇',
-  description: 'Sub2API 摇摇卡奖励活动',
+  title: 'Sub2API 充值幸运大转盘',
+  description: 'Sub2API 充值摇摇卡奖励活动',
 };
 
 export default async function RootLayout({
