@@ -1,5 +1,5 @@
 import { randomInt } from 'crypto';
-import { Prisma, type ActivityDrawRecord } from '@prisma/client';
+import { Prisma, type ActivityDrawRecord, type ActivityRewardStatus } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { getEnv } from '@/lib/config';
 import { addBalance, getUserSubscriptions, listPaymentOrders } from '@/lib/sub2api/client';
@@ -128,19 +128,21 @@ export function filterValidRechargeOrders(
   startAt: Date,
   endAt: Date,
 ): Sub2ApiPaymentOrder[] {
-  return orders.filter((order) => {
-    const paidAt = parsePaidAt(order);
-    return (
-      Number(order.user_id) === userId &&
-      order.status?.toUpperCase() === 'COMPLETED' &&
-      order.order_type?.toLowerCase() === 'balance' &&
-      Number(order.refund_amount) === 0 &&
-      Number(order.amount) > 0 &&
-      paidAt !== null &&
-      paidAt >= startAt &&
-      paidAt < endAt
-    );
-  });
+  return orders.filter((order) => isValidRechargeOrder(order, userId, startAt, endAt));
+}
+
+function isValidRechargeOrder(order: Sub2ApiPaymentOrder, userId: number, startAt: Date, endAt: Date): boolean {
+  const paidAt = parsePaidAt(order);
+  return (
+    Number(order.user_id) === userId &&
+    order.status?.toUpperCase() === 'COMPLETED' &&
+    order.order_type?.toLowerCase() === 'balance' &&
+    Number(order.refund_amount) === 0 &&
+    Number(order.amount) > 0 &&
+    paidAt !== null &&
+    paidAt >= startAt &&
+    paidAt < endAt
+  );
 }
 
 export function buildEligiblePrizePool(input: {
@@ -191,7 +193,7 @@ function isActiveSubscription(subscription: Sub2ApiSubscription, now: Date): boo
   );
 }
 
-async function loadUserOrders(userId: number): Promise<Sub2ApiPaymentOrder[]> {
+async function loadPaymentOrders(userId?: number): Promise<Sub2ApiPaymentOrder[]> {
   const pageSize = 100;
   const orders: Sub2ApiPaymentOrder[] = [];
   let page = 1;
@@ -201,15 +203,31 @@ async function loadUserOrders(userId: number): Promise<Sub2ApiPaymentOrder[]> {
       page,
       page_size: pageSize,
       timezone: SUB2API_TIMEZONE,
-      user_id: userId,
+      ...(userId === undefined ? {} : { user_id: userId }),
       status: 'COMPLETED',
       order_type: 'balance',
     });
     orders.push(...result.items);
-    pages = Math.max(1, Math.ceil(result.total / Math.max(1, result.page_size)));
+    const responsePageSize = Math.max(1, result.page_size || pageSize);
+    const inferredPages =
+      result.total > 0
+        ? Math.ceil(result.total / responsePageSize)
+        : result.items.length >= responsePageSize
+          ? page + 1
+          : page;
+    pages = Math.max(1, result.pages ?? inferredPages);
+    if (!result.items.length) break;
     page += 1;
   } while (page <= pages);
   return orders;
+}
+
+async function loadUserOrders(userId: number): Promise<Sub2ApiPaymentOrder[]> {
+  return loadPaymentOrders(userId);
+}
+
+async function loadAllPaymentOrders(): Promise<Sub2ApiPaymentOrder[]> {
+  return loadPaymentOrders();
 }
 
 function getActivityWindow() {
@@ -239,6 +257,99 @@ function serializeRecord(record: ActivityDrawRecord) {
     issuedAt: record.issuedAt,
     createdAt: record.createdAt,
   };
+}
+
+export interface LotteryAdminUser {
+  userId: number;
+  email: string | null;
+  totalRechargeAmount: number;
+  earnedCards: number;
+  usedCards: number;
+  availableCards: number;
+  records: ReturnType<typeof serializeRecord>[];
+}
+
+export function aggregateLotteryUsers(input: {
+  records: ActivityDrawRecord[];
+  orders: Sub2ApiPaymentOrder[];
+  startAt: Date;
+  endAt: Date;
+  active: boolean;
+}): LotteryAdminUser[] {
+  const userIds = new Set<number>();
+  const emailByUser = new Map<number, string>();
+  const rechargeByUser = new Map<number, number>();
+  const recordsByUser = new Map<number, ReturnType<typeof serializeRecord>[]>();
+
+  for (const order of input.orders) {
+    const userId = Number(order.user_id);
+    if (!Number.isInteger(userId) || userId <= 0) continue;
+    const email = order.user_email?.trim();
+    if (email && !emailByUser.has(userId)) emailByUser.set(userId, email);
+    if (!isValidRechargeOrder(order, userId, input.startAt, input.endAt)) continue;
+    userIds.add(userId);
+    rechargeByUser.set(userId, (rechargeByUser.get(userId) ?? 0) + Number(order.amount));
+  }
+
+  for (const record of input.records) {
+    userIds.add(record.userId);
+    const records = recordsByUser.get(record.userId) ?? [];
+    records.push(serializeRecord(record));
+    recordsByUser.set(record.userId, records);
+  }
+
+  return [...userIds]
+    .map((userId) => {
+      const records = (recordsByUser.get(userId) ?? []).sort((left, right) => left.drawIndex - right.drawIndex);
+      const totalRechargeAmount = Number((rechargeByUser.get(userId) ?? 0).toFixed(2));
+      const earnedCards = calculateEarnedCards(totalRechargeAmount);
+      const usedCards = countUsedCards(records.map((record) => record.prize.key));
+      return {
+        userId,
+        email: emailByUser.get(userId) ?? null,
+        totalRechargeAmount,
+        earnedCards,
+        usedCards,
+        availableCards: input.active ? Math.max(0, earnedCards - usedCards) : 0,
+        records,
+      };
+    })
+    .sort((left, right) => {
+      if (right.totalRechargeAmount !== left.totalRechargeAmount) {
+        return right.totalRechargeAmount - left.totalRechargeAmount;
+      }
+      if (right.usedCards !== left.usedCards) return right.usedCards - left.usedCards;
+      return left.userId - right.userId;
+    });
+}
+
+export async function getLotteryAdminUsers(issueStatus?: ActivityRewardStatus, now = new Date()) {
+  const { startAt, endAt } = getActivityWindow();
+  const [records, orderResult] = await Promise.all([
+    prisma.activityDrawRecord.findMany({
+      where: { activityKey: LOTTERY_ACTIVITY_KEY },
+      orderBy: [{ userId: 'asc' }, { drawIndex: 'asc' }],
+    }),
+    loadAllPaymentOrders()
+      .then((orders) => ({ orders, available: true }))
+      .catch((error) => {
+        console.error('Load lottery admin recharge data failed:', error);
+        return { orders: [] as Sub2ApiPaymentOrder[], available: false };
+      }),
+  ]);
+  const users = aggregateLotteryUsers({
+    records,
+    orders: orderResult.orders,
+    startAt,
+    endAt,
+    active: now >= startAt && now < endAt,
+  });
+  const visibleUsers = issueStatus
+    ? users
+        .map((user) => ({ ...user, records: user.records.filter((record) => record.issueStatus === issueStatus) }))
+        .filter((user) => user.records.length > 0)
+    : users;
+  return { users: visibleUsers, rechargeDataAvailable: orderResult.available };
 }
 
 async function loadEligibility(userId: number, now = new Date()) {

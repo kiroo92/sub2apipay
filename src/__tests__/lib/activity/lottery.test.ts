@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Prisma, type ActivityDrawRecord } from '@prisma/client';
 
 const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('@/lib/sub2api/client', () => ({
   listPaymentOrders: mocks.listPaymentOrders,
 }));
 import {
+  aggregateLotteryUsers,
   buildEligiblePrizePool,
   calculateEarnedCards,
   countUsedCards,
@@ -35,6 +37,26 @@ const baseOrder: Sub2ApiPaymentOrder = {
   created_at: '2026-08-02T00:00:00.000Z',
   paid_at: '2026-08-02T00:00:00.000Z',
 };
+
+function makeDrawRecord(overrides: Partial<ActivityDrawRecord> = {}): ActivityDrawRecord {
+  return {
+    id: 'draw-1',
+    activityKey: 'recharge-lottery-2026-08',
+    userId: 7,
+    requestId: '123e4567-e89b-42d3-a456-426614174000',
+    drawIndex: 1,
+    prizeKey: 'balance_5',
+    prizeAmount: new Prisma.Decimal('5'),
+    prizeReason: 'RANDOM',
+    issueStatus: 'ISSUED',
+    issueError: null,
+    issuedAt: new Date('2026-08-08T00:00:00.000Z'),
+    adminNote: null,
+    createdAt: new Date('2026-08-08T00:00:00.000Z'),
+    updatedAt: new Date('2026-08-08T00:00:00.000Z'),
+    ...overrides,
+  };
+}
 
 describe('lottery rules', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -83,6 +105,66 @@ describe('lottery rules', () => {
         new Date('2026-09-01T00:00:00.000Z'),
       ).map((order) => order.id),
     ).toEqual(['order-1']);
+  });
+
+  it('aggregates recharge users, unused cards, and legacy draw records', () => {
+    const users = aggregateLotteryUsers({
+      startAt: new Date('2026-08-07T00:00:00.000Z'),
+      endAt: new Date('2026-09-01T00:00:00.000Z'),
+      active: true,
+      orders: [
+        {
+          ...baseOrder,
+          user_id: 7,
+          user_email: 'seven@example.com',
+          amount: 120,
+          paid_at: '2026-08-07T01:00:00.000Z',
+        },
+        {
+          ...baseOrder,
+          id: 'order-2',
+          user_id: 8,
+          user_email: 'eight@example.com',
+          amount: 20,
+          paid_at: '2026-08-07T02:00:00.000Z',
+        },
+        {
+          ...baseOrder,
+          id: 'outside-window',
+          user_id: 8,
+          amount: 1000,
+          paid_at: '2026-08-02T00:00:00.000Z',
+        },
+      ],
+      records: [
+        makeDrawRecord(),
+        makeDrawRecord({
+          id: 'draw-2',
+          requestId: '123e4567-e89b-42d3-a456-426614174001',
+          drawIndex: 2,
+          prizeKey: 'balance_240',
+          prizeAmount: new Prisma.Decimal('240'),
+        }),
+      ],
+    });
+
+    expect(users.map((user) => user.userId)).toEqual([7, 8]);
+    expect(users[0]).toMatchObject({
+      email: 'seven@example.com',
+      totalRechargeAmount: 120,
+      earnedCards: 2,
+      usedCards: 2,
+      availableCards: 0,
+    });
+    expect(users[0].records[1].prize.name).toBe('$240 额度');
+    expect(users[1]).toMatchObject({
+      email: 'eight@example.com',
+      totalRechargeAmount: 20,
+      earnedCards: 1,
+      usedCards: 0,
+      availableCards: 1,
+      records: [],
+    });
   });
 
   it('removes reset prizes for users without an active subscription', () => {

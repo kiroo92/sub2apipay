@@ -40,7 +40,7 @@ function normalizePaymentOrder(raw: Record<string, unknown>): Sub2ApiPaymentOrde
       raw.user_name ?? raw.userName ?? (raw.user as { username?: string } | undefined)?.username,
     ),
     user_email: toNullableString(
-      raw.user_email ?? raw.userEmail ?? (raw.user as { email?: string } | undefined)?.email,
+      raw.user_email ?? raw.userEmail ?? raw.email ?? (raw.user as { email?: string } | undefined)?.email,
     ),
     user_notes: toNullableString(
       raw.user_notes ?? raw.userNotes ?? (raw.user as { notes?: string } | undefined)?.notes,
@@ -78,7 +78,7 @@ export async function listPaymentOrders(params?: {
   user_id?: number;
   status?: string;
   order_type?: string;
-}): Promise<{ items: Sub2ApiPaymentOrder[]; total: number; page: number; page_size: number }> {
+}): Promise<{ items: Sub2ApiPaymentOrder[]; total: number; page: number; page_size: number; pages?: number }> {
   const env = getEnv();
   const qs = new URLSearchParams();
   qs.set('page', String(params?.page ?? 1));
@@ -99,8 +99,10 @@ export async function listPaymentOrders(params?: {
   }
 
   const payload = await response.json();
-  const data = payload.data ?? payload;
-  const paginated = data?.items ? data : data?.data?.items ? data.data : data;
+  const candidates = [payload?.data?.data, payload?.data, payload].filter(
+    (candidate) => candidate && Array.isArray(candidate.items),
+  );
+  const paginated = candidates[0] ?? {};
   const itemsRaw = Array.isArray(paginated?.items) ? paginated.items : [];
 
   return {
@@ -108,6 +110,7 @@ export async function listPaymentOrders(params?: {
     total: Number(paginated?.total ?? itemsRaw.length ?? 0),
     page: Number(paginated?.page ?? params?.page ?? 1),
     page_size: Number(paginated?.page_size ?? params?.page_size ?? itemsRaw.length ?? 0),
+    pages: Number(paginated?.pages ?? paginated?.total_pages ?? 0) || undefined,
   };
 }
 

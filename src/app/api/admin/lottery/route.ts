@@ -6,6 +6,7 @@ import {
   ActivityError,
   LOTTERY_ACTIVITY_KEY,
   LOTTERY_PRIZES,
+  getLotteryAdminUsers,
   markLotteryVoucherRedeemed,
   retryLotteryIssue,
 } from '@/lib/activity/lottery';
@@ -14,11 +15,13 @@ export async function GET(request: NextRequest) {
   if (!(await verifyAdminToken(request))) return unauthorizedResponse(request);
   const page = Math.max(1, Number(request.nextUrl.searchParams.get('page') || 1));
   const pageSize = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get('page_size') || 20)));
+  const userPage = Math.max(1, Number(request.nextUrl.searchParams.get('user_page') || 1));
+  const userPageSize = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get('user_page_size') || 20)));
   const requestedStatus = request.nextUrl.searchParams.get('issueStatus')?.trim() as ActivityRewardStatus | undefined;
   const statuses: ActivityRewardStatus[] = ['PENDING', 'ISSUED', 'ISSUE_FAILED', 'MANUAL_PENDING', 'MANUAL_REDEEMED'];
   const issueStatus = requestedStatus && statuses.includes(requestedStatus) ? requestedStatus : undefined;
   const where = { activityKey: LOTTERY_ACTIVITY_KEY, ...(issueStatus ? { issueStatus } : {}) };
-  const [records, total, prizeGroups, issueStats, grandPrizeUsers, issuedTotals] = await Promise.all([
+  const [records, total, prizeGroups, issueStats, grandPrizeUsers, issuedTotals, adminUsers] = await Promise.all([
     prisma.activityDrawRecord.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -46,7 +49,11 @@ export async function GET(request: NextRequest) {
       where: { activityKey: LOTTERY_ACTIVITY_KEY, issueStatus: 'ISSUED' },
       _sum: { prizeAmount: true },
     }),
+    getLotteryAdminUsers(issueStatus),
   ]);
+  const userTotal = adminUsers.users.length;
+  const userTotalPages = Math.max(1, Math.ceil(userTotal / userPageSize));
+  const users = adminUsers.users.slice((userPage - 1) * userPageSize, userPage * userPageSize);
   const groupedByPrize = Object.fromEntries(prizeGroups.map((item) => [item.prizeKey, item]));
   return NextResponse.json({
     summary: {
@@ -67,6 +74,12 @@ export async function GET(request: NextRequest) {
     }),
     issueStats: issueStats.map((item) => ({ issueStatus: item.issueStatus, count: item._count._all })),
     records: records.map((record) => ({ ...record, prizeAmount: Number(record.prizeAmount), issueError: undefined })),
+    users,
+    recharge_data_available: adminUsers.rechargeDataAvailable,
+    user_page: userPage,
+    user_page_size: userPageSize,
+    total_users: userTotal,
+    user_total_pages: userTotalPages,
     page,
     page_size: pageSize,
     total,

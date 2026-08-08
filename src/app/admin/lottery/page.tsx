@@ -15,6 +15,22 @@ interface AdminRecord {
   issueStatus: string;
   createdAt: string;
 }
+interface AdminUserRecord {
+  id: string;
+  drawIndex: number;
+  prize: { key: string; name: string; amount: number };
+  issueStatus: string;
+  createdAt: string;
+}
+interface AdminUser {
+  userId: number;
+  email: string | null;
+  totalRechargeAmount: number;
+  earnedCards: number;
+  usedCards: number;
+  availableCards: number;
+  records: AdminUserRecord[];
+}
 interface AdminData {
   summary: { totalDraws: number; issuedAmount: number; grandPrizeUsers: number };
   prizeStats: Array<{
@@ -26,6 +42,12 @@ interface AdminData {
   }>;
   issueStats: Array<{ issueStatus: string; count: number }>;
   records: AdminRecord[];
+  users: AdminUser[];
+  recharge_data_available: boolean;
+  user_page: number;
+  user_page_size: number;
+  total_users: number;
+  user_total_pages: number;
   total: number;
   page: number;
   total_pages: number;
@@ -61,7 +83,8 @@ function AdminLotteryContent() {
   const [ready, setReady] = useState(false);
   const [data, setData] = useState<AdminData | null>(null);
   const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
+  const [userPage, setUserPage] = useState(1);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
 
@@ -83,7 +106,12 @@ function AdminLotteryContent() {
     if (!token) {
       return;
     }
-    const params = new URLSearchParams({ page: String(page), page_size: '20' });
+    const params = new URLSearchParams({
+      page: '1',
+      page_size: '20',
+      user_page: String(userPage),
+      user_page_size: '20',
+    });
     if (status) params.set('issueStatus', status);
     try {
       const response = await fetch(`/api/admin/lottery?${params}`, {
@@ -101,13 +129,16 @@ function AdminLotteryContent() {
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '管理数据加载失败');
     }
-  }, [page, status, token]);
+  }, [status, token, userPage]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const runAction = async (record: AdminRecord, action: 'retry_issue' | 'mark_redeemed') => {
+  const runAction = async (
+    record: Pick<AdminRecord, 'id' | 'issueStatus'>,
+    action: 'retry_issue' | 'mark_redeemed',
+  ) => {
     let note = '';
     if (action === 'mark_redeemed') {
       note = window.prompt('填写套餐重置处理备注')?.trim() || '';
@@ -229,7 +260,8 @@ function AdminLotteryContent() {
                 value={status}
                 onChange={(event) => {
                   setStatus(event.target.value);
-                  setPage(1);
+                  setUserPage(1);
+                  setExpandedUserId(null);
                 }}
               >
                 <option value="">全部</option>
@@ -240,59 +272,117 @@ function AdminLotteryContent() {
                 ))}
               </select>
             </label>
-            <span>共 {data.total} 条记录</span>
+            <span>
+              共 {data.total_users} 位用户 · {data.total} 条记录
+            </span>
           </div>
-          <section className="admin-table" aria-label="抽奖记录">
-            <div className="admin-table__head">
-              <span>用户 / 次数</span>
-              <span>奖品</span>
-              <span>原因</span>
-              <span>状态</span>
-              <span>时间</span>
-              <span>操作</span>
+          {!data.recharge_data_available ? (
+            <div className="admin-warning">充值数据暂时无法同步，下面的充值和可抽次数可能暂不准确。</div>
+          ) : null}
+          <section className="admin-users" aria-label="用户抽奖汇总">
+            <div className="admin-users__head">
+              <span>用户</span>
+              <span>活动充值</span>
+              <span>已抽奖</span>
+              <span>可抽奖</span>
+              <span>记录</span>
+              <span>查看</span>
             </div>
-            {data.records.map((record) => (
-              <article className="admin-table__row" key={record.id}>
-                <div>
-                  <strong>UID {record.userId}</strong>
-                  <small>
-                    第 {record.drawIndex} 次 · {record.id.slice(-8)}
-                  </small>
-                </div>
-                <div>
-                  <strong>{PRIZE_NAMES[record.prizeKey] ?? record.prizeKey}</strong>
-                  <small>${record.prizeAmount.toFixed(2)}</small>
-                </div>
-                <span>{record.prizeReason === 'HIGH_RECHARGE_GUARANTEE' ? '历史保底' : '库存奖池'}</span>
-                <span className={`admin-status admin-status--${record.issueStatus.toLowerCase()}`}>
-                  {STATUS_NAMES[record.issueStatus] ?? record.issueStatus}
-                </span>
-                <time>{new Date(record.createdAt).toLocaleString('zh-CN')}</time>
-                <div className="admin-actions">
-                  {['ISSUE_FAILED', 'PENDING'].includes(record.issueStatus) ? (
-                    <button disabled={busyId === record.id} onClick={() => void runAction(record, 'retry_issue')}>
-                      重试发放
+            {data.users.map((user) => {
+              const expanded = expandedUserId === user.userId;
+              const rechargeValue = data.recharge_data_available
+                ? `$${user.totalRechargeAmount.toFixed(2)}`
+                : '暂不可用';
+              const earnedValue = data.recharge_data_available ? `${user.earnedCards} 张` : '暂不可用';
+              const availableValue = data.recharge_data_available ? `${user.availableCards} 次` : '暂不可用';
+              return (
+                <article className={`admin-user${expanded ? ' is-expanded' : ''}`} key={user.userId}>
+                  <div className="admin-user__summary">
+                    <div className="admin-user__identity">
+                      <strong>{user.email || `UID ${user.userId}`}</strong>
+                      <small>
+                        UID {user.userId} · 已获得 {earnedValue}
+                      </small>
+                    </div>
+                    <strong>{rechargeValue}</strong>
+                    <span>{user.usedCards} 次</span>
+                    <strong>{availableValue}</strong>
+                    <span>{user.records.length} 条</span>
+                    <button
+                      className="admin-user__toggle"
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() => setExpandedUserId(expanded ? null : user.userId)}
+                    >
+                      {expanded ? '收起' : '查看记录'}
                     </button>
+                  </div>
+                  {expanded ? (
+                    <div className="admin-user__details">
+                      <div className="admin-user__details-heading">
+                        <strong>抽奖记录</strong>
+                        <span>{user.records.length ? `共 ${user.records.length} 次` : '尚未抽奖'}</span>
+                      </div>
+                      {user.records.length ? (
+                        <div className="admin-user-record admin-user-record--head">
+                          <span>奖品</span>
+                          <span>额度</span>
+                          <span>状态</span>
+                          <span>时间</span>
+                          <span>操作</span>
+                        </div>
+                      ) : null}
+                      {user.records.map((record) => (
+                        <div className="admin-user-record" key={record.id}>
+                          <div>
+                            <strong>{record.prize.name}</strong>
+                            <small>
+                              第 {record.drawIndex} 次 · {record.id.slice(-8)}
+                            </small>
+                          </div>
+                          <span>${record.prize.amount.toFixed(2)}</span>
+                          <span className={`admin-status admin-status--${record.issueStatus.toLowerCase()}`}>
+                            {STATUS_NAMES[record.issueStatus] ?? record.issueStatus}
+                          </span>
+                          <time>{new Date(record.createdAt).toLocaleString('zh-CN')}</time>
+                          <div className="admin-actions">
+                            {['ISSUE_FAILED', 'PENDING'].includes(record.issueStatus) ? (
+                              <button
+                                disabled={busyId === record.id}
+                                onClick={() => void runAction(record, 'retry_issue')}
+                              >
+                                重试发放
+                              </button>
+                            ) : null}
+                            {record.issueStatus === 'MANUAL_PENDING' ? (
+                              <button
+                                disabled={busyId === record.id}
+                                onClick={() => void runAction(record, 'mark_redeemed')}
+                              >
+                                标记已兑换
+                              </button>
+                            ) : null}
+                            {!['ISSUE_FAILED', 'PENDING', 'MANUAL_PENDING'].includes(record.issueStatus) ? (
+                              <span>-</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : null}
-                  {record.issueStatus === 'MANUAL_PENDING' ? (
-                    <button disabled={busyId === record.id} onClick={() => void runAction(record, 'mark_redeemed')}>
-                      标记已兑换
-                    </button>
-                  ) : null}
-                  {!['ISSUE_FAILED', 'PENDING', 'MANUAL_PENDING'].includes(record.issueStatus) ? <span>-</span> : null}
-                </div>
-              </article>
-            ))}
-            {!data.records.length ? <div className="admin-empty">暂无符合条件的记录</div> : null}
+                </article>
+              );
+            })}
+            {!data.users.length ? <div className="admin-empty">暂无符合条件的用户</div> : null}
           </section>
           <nav className="admin-pagination">
-            <button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+            <button disabled={userPage <= 1} onClick={() => setUserPage((value) => value - 1)}>
               上一页
             </button>
             <span>
-              {page} / {Math.max(1, data.total_pages)}
+              {userPage} / {Math.max(1, data.user_total_pages)}
             </span>
-            <button disabled={page >= data.total_pages} onClick={() => setPage((value) => value + 1)}>
+            <button disabled={userPage >= data.user_total_pages} onClick={() => setUserPage((value) => value + 1)}>
               下一页
             </button>
           </nav>
