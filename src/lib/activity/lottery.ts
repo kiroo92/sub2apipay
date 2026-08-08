@@ -150,12 +150,15 @@ export function buildEligiblePrizePool(input: {
   priorPrizeKeys: string[];
   awardedByPrize?: Readonly<Record<string, number>>;
   firstDrawOnly?: boolean;
+  additionalCardGuarantee?: boolean;
 }): LotteryPrize[] {
+  const lowestPrizeWeight = LOTTERY_PRIZES.find((prize) => prize.key === 'balance_2')?.weight ?? 0;
   const hasGrandPrize = input.priorPrizeKeys.some(
     (key) => LOTTERY_PRIZES.some((prize) => prize.key === key && prize.grand) || LEGACY_GRAND_PRIZE_KEYS.has(key),
   );
   return LOTTERY_PRIZES.flatMap((prize) => {
     if (input.firstDrawOnly && prize.key !== 'balance_2' && prize.key !== 'balance_5') return [];
+    if (input.additionalCardGuarantee && prize.key === 'balance_2') return [];
     if (prize.key === 'quota_reset' && !input.hasActiveSubscription) return [];
     if (prize.grand && hasGrandPrize) return [];
     const awarded = input.awardedByPrize?.[prize.key] ?? 0;
@@ -163,7 +166,13 @@ export function buildEligiblePrizePool(input: {
       const remaining = Math.max(0, prize.initialStock - awarded);
       return remaining > 0 ? [{ ...prize, initialStock: remaining, weight: remaining }] : [];
     }
-    return [{ ...prize }];
+    return [
+      {
+        ...prize,
+        weight:
+          input.additionalCardGuarantee && prize.key === 'balance_5' ? prize.weight + lowestPrizeWeight : prize.weight,
+      },
+    ];
   });
 }
 
@@ -496,6 +505,7 @@ export async function drawLotteryPrize(userId: number, requestId: string, now = 
         priorPrizeKeys: records.map((record) => record.prizeKey),
         awardedByPrize,
         firstDrawOnly: usedCards === 0,
+        additionalCardGuarantee: usedCards > 0,
       }),
     );
     const immediate = prize.redraw;

@@ -184,6 +184,19 @@ describe('lottery rules', () => {
     expect(pickWeightedPrize(pool, 5_910).key).toBe('balance_5');
   });
 
+  it('moves the $2 weight to $5 for every additional recharge card', () => {
+    const pool = buildEligiblePrizePool({
+      hasActiveSubscription: true,
+      priorPrizeKeys: [],
+      additionalCardGuarantee: true,
+    });
+    expect(pool.find((prize) => prize.key === 'balance_2')).toBeUndefined();
+    expect(pool.find((prize) => prize.key === 'balance_5')?.weight).toBe(8_910);
+    expect(pickWeightedPrize(pool, 0).key).toBe('balance_5');
+    expect(pickWeightedPrize(pool, 8_909).key).toBe('balance_5');
+    expect(pickWeightedPrize(pool, 8_910).key).toBe('balance_10');
+  });
+
   it('removes every grand prize after the user has won one', () => {
     const pool = buildEligiblePrizePool({ hasActiveSubscription: true, priorPrizeKeys: ['balance_240'] });
     expect(pool.find((prize) => prize.key === 'balance_50')).toBeUndefined();
